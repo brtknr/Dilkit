@@ -1,0 +1,150 @@
+<?php
+bodyHeader("Credits",2);
+
+if (!hasPassed($_SESSION[profileID])){	//------ If the client has yet to pass, proceed.
+	if ($theDIID = getDIIDFromLearnerID($_SESSION[profileID])) {	//------ Retrieve the DI who the client is associated to and proceed if the association is found
+		if (isActiveProfile($theDIID)) {	//------ If the profile of the DI the learner is associated to is active, proceed.
+	
+			$creditAlert = "";	//------ Reset the content of the credit related alert to blank
+			$db = new database;	//------ Establish connection with the database.
+	
+			if ($creditAmount = $_POST[credit_amount]){	//------ Retrive the amount of credit the client wishes to purchase from the submitted form and proceed if it is greater than 0
+				$feeDetails = getFeeDetailsFromDIID($theDIID);	//------ Retrieve the details of the fee
+				
+				if (!$feeDetails[0][fee_active]){	//------ If there arent any active fee assigned by the DI who the client is attempting to purchase the credit from, show the message below
+					$creditAlert.= "Missing details (Fee: the DI doesn't have an active fee)";
+				} else if (!($creditAmount > 0) || !($creditAmount < 100)){	//------ If the specified amount of credit is not within the boundary, show the message below
+					$creditAlert.= "Out of bound (Credit Amount: it must be between 1 and 99)\n";
+				}
+				
+				if (!$creditAlert){	//------ If there aren't any alerts, proceed.
+					if(!$newTransactionID = getNextID("transaction")) $newTransactionID = 100000;	//------ Retrieve the next available transaction ID
+					
+					$q = 	"INSERT INTO `dilkit`.`transaction` (`transaction_id`,`transaction_amount`,`transaction_date_time`,`learner_id`,`fee_id`) VALUES ('$newTransactionID','$creditAmount',NOW(),'".$_SESSION[profileID]."','".$feeDetails[0][fee_id]."');";
+					$db->rawQuery($q);	//------ Insert the transactional information to the database table.
+					
+					$rawAmount = number_format($feeDetails[0][fee_amount] * $creditAmount,2);	//------ Work out the raw amount the learner is obliged to pay to 2 decimal places
+					
+					$discountPercentage = number_format(getApplicableDiscount ($feeDetails[0][fee_id], $creditAmount),2);	//------ Retrieve the discount percentage applicable to the transaction to 2 decimal places
+					
+					$discount = number_format(discount($rawAmount, $discountPercentage),2);	//------ Work out the discount applicable to 2 decimal places
+					
+					$charge = number_format($rawAmount - $discount,2);	//------ Work out the actual amount that is charged to 2 decimal places
+					
+					$creditAlert = "The transaction has been completed and $creditAmount new credit(s) have been added to your account.<br/>\n";	//------ Output the message acknowledging the completion of the transaction.
+					if ($discountPercentage) {	//------ If there was a discount that the transaction was elegible to, output acknowledgement indicating the amount.
+						$creditAlert.= "The raw total amount was £$rawAmount but you were eligible for $discountPercentage% discount.<br/>\n";
+					} else $creditAlert.= "You weren't eligible for any discounts.<br/>\n";	//------ Output this message if the client wasn't eligible for any discounts
+					$creditAlert.= "The exact final charge that will incur on your bill will be £$charge.\n";	//------ Output message indicating the final amount the client has to pay
+					
+					$_POST = "";	//------ Reset the content of the form to blank
+				}
+			}
+			
+			$creditAlert = $creditAlert?"<p>$creditAlert</p>":"";	//------ Output the alerts related to purchasing credits.
+	
+			if ($credits = getRemainingLearnerCredit($_SESSION[profileID])) $creditAlert.= "You can still book $credits more lesson(s) with this DI. If you wish however, you may purchase credits for more lessons.\n";	//------ Retrieve the amount of credit the client currently has and output if there are any.
+			else $creditAlert.= "<div class = \"negative\">You have no credit to book any more lessons. Purchase credits here to be able to book some.</div>\n";	//------ If the client has no credit, show this message.		
+?>
+	<table border="0" width="100%" cellspacing="0" cellpadding="0">
+		<tr>
+			<td valign="top">
+			<form name="creditForm" method="POST" action="?p=credits">
+				<table border="0" width="100%" cellspacing="5" cellpadding="5">
+					<tr>
+						<td colspan="2">
+						<?=$creditAlert?> </td>
+					</tr>
+					<?php
+				$feeDetails = getFeeDetailsFromDIID($theDIID);	//------ Retrieve the detail of the fee amount the DI is currently charging
+				
+				if ($feeDetails[0][fee_active]){	//------ If the fee is active, show this message
+			
+				$offers = "";	//------ Reset the content of the offers to blank
+	
+				if ($offerDetails = getOfferDetailsFromFeeID($feeDetails[0][fee_id])){	//------ Retrieve thelist of the offers and proceed if there are any
+					foreach ($offerDetails as $theOffer){	//------ Retrieve the detail of the offer from the list one at a time
+						if ($theOffer[offer_lesson_cap] && $theOffer[offer_discount_percentage]){	//------ If the lesson cap and the percentage are above 0, proceed
+							$discountAmount = discount($feeDetails[0][fee_amount], $theOffer[offer_discount_percentage]);	//------ Work out the discount the client may be eligible to from the offer
+							$offers.= "<li>£".number_format($feeDetails[0][fee_amount]-$discountAmount,2)." (".$theOffer[offer_discount_percentage]."% off) per lesson when minimum of $theOffer[offer_lesson_cap] lessons purchased</li>\n";	//------ Add to the list of offers available
+						}
+					}
+				}
+				
+				$offers = "<ul>$offers</ul>";	//------ Enclose the offers inside an unordered list
+?>
+					<tr>
+						<td colspan="2" height="49">
+						<!-- Show the amount the DI is currently charging -->
+						Your DI is currently charging £<?=number_format($feeDetails[0][fee_amount],2)?> 
+								per lesson.</td>
+					</tr>
+					<tr>
+						<td colspan="2" height="49" align="center">
+						<table border="0" cellspacing="5" cellpadding="5" bgcolor="#6CB89C">
+							<tr>
+								<td bgcolor="#99CFB0">
+								<h4>Active Offers</h4>
+								 </td>
+								<td>
+								<!-- Show the available offers -->
+								<?=$offers?></td>
+							</tr>
+						</table>
+						</td>
+					</tr>
+					<!-- Show the form that asks for transactional details -->
+					<tr>
+						<td width="50%" align="right" bgcolor="#99CFB0">How many 
+						credits do you wish to purchase?</td>
+						<td bgcolor="#6CB89C">
+						<input type="text" name="credit_amount" size="5" maxlength="5" value="<?=$_POST[credit_amount]?>"></td>
+					</tr>
+					<tr>
+						<td width="50%" bgcolor="#99CFB0" align="right">Card Type</td>
+						<td bgcolor="#6CB89C">
+						<input disabled type="text" name="disabled" size="10" maxlength="5" value="N/A"></td>
+					</tr>
+					<tr>
+						<td width="50%" bgcolor="#99CFB0" align="right">Cardholder&#39;s 
+						Name</td>
+						<td bgcolor="#6CB89C">
+						<input disabled type="text" name="disabled0" size="15" maxlength="5" value="N/A"></td>
+					</tr>
+					<tr>
+						<td width="50%" bgcolor="#99CFB0" align="right">Card Number</td>
+						<td bgcolor="#6CB89C">
+						<input disabled type="text" name="disabled1" size="15" maxlength="5" value="N/A"></td>
+					</tr>
+					<tr>
+						<td width="50%" bgcolor="#99CFB0" align="right">Expiry Date</td>
+						<td bgcolor="#6CB89C">
+						<input disabled type="text" name="disabled2" size="10" maxlength="5" value="N/A"></td>
+					</tr>
+					<tr>
+						<td width="50%">&nbsp;</td>
+						<td>
+						<input type="submit" value="Make Purchase!" name="make_purchase"></td>
+					</tr>
+					<?php
+			} else {	//------ If there is no fee assigned by the DI, show the message below and not the form
+?>
+					<tr>
+						<td bgcolor="#99CFB0" colspan="2">Your DI currently hasn&#39;t 
+						yet assigned any fee.</td>
+					</tr>
+					<?php
+			}
+?>
+				</table>
+			</form>
+			</td>
+		</tr>
+	</table>
+<?php	
+		} else echo "Your DI has been suspended by the administrator. Please choose another or <a href = \"?p=contactUs\">seek assistance</a>.";	//------ This message is shown if the DI associated with the learner has been suspended
+	} else echo  "This account is not associated with a DI. Please <a href = \"?p=welcomePage\">click here</a> and follow the instructions on the right hand side.";	//------ This message is shown if the learner is not associated with a DI
+} else echo  "You have already passed. Why do you need more credit?";	//------ This message is shown if the learner has already passed and doesnt need to buy any more credits.
+
+bodyFooter();
+?>

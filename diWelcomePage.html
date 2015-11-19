@@ -1,0 +1,88 @@
+<table border="0" width="100%" cellspacing="0" cellpadding="0">
+	<tr>
+		<td>
+		<table border="0" width="100%" cellspacing="0" cellpadding="0">
+			<tr>
+				<td><?php
+bodyHeader("Welcome",1);
+?> This website is an online tool that acts as an easy and comprehensive medium 
+				via which a DI and a learner can communicate with each other. <?php
+	bodyFooter();
+?> </td>
+			</tr>
+			<tr>
+				<td><?php
+bodyHeader("What can you expect from us?",2);		
+?>
+				<ul>
+					<li>View all your active and past clients</li>
+					<li>Keep a comprehensive track of their progress</li>
+					<li>Never lose track of where the next appointment is</li>
+					<li>Keep track of your finance</li>
+					<li>Communicate with your clients</li>
+					<li>24/7 help and support</li>
+				</ul>
+				<?php
+bodyFooter();
+?> </td>
+			</tr>
+		</table>
+		</td>
+		<td bgcolor="#6CB89C" valign="top"><?php
+GLOBAL $validation; //------- Retrieves the validation rules set at global.php
+	
+bodyHeader("Notifications",2);
+
+if ($theNewBuzzword = trim(strtolower($_POST[di_buzzword]))){ //------ This retrieves the buzzword from the submitted form if the DI has requested to create or change the buzzword
+	
+	if (!ereg($validation[Alphabets], $theNewBuzzword)||strlen($theNewBuzzword)>10||strlen($theNewBuzzword)<5){	//------ This makes sure the buzzword only consists of alphabetical characters and if not, it shows the following message.
+		echo "<div class = \"negative\">Buzzword (permitted characters: alphabets only) (max length: 10 characters) (min length: 5 characters)</div>";
+	} else { //------ If the buzzword is a valid buzzword, it proceeds with the following.
+		if (getDIIDFromBuzzword($theNewBuzzword)){	//------ This retrieves the DI ID the supplied buzzword is linked to in case the buzzword has already been taken by someone else. If that is the case, it outputs the following message.
+			echo "<div class = \"negative\">Duplicate Buzzword: this buzzword is already taken.</div>";
+		} else {	//------ If the supplied buzzword is unique, it proceeds with the enclosed instructions.
+			$db = new database;	//------ This establishes connection with the database.
+			
+			$q = 	"UPDATE `dilkit`.`di` SET `di_approved` = '0', `di_buzzword` = '$theNewBuzzword' WHERE `di_id` = '$_SESSION[profileID]' LIMIT 1;";						
+				
+			$db->rawQuery($q); //------ The query updates the  status of the DI as pending approval as well as assign the new buzzword.
+			
+			echo "<p>Thank you for entering the buzzword. Please keep it ready for when a learner calls.</p>"; //------ This message is outputted to acknowledge that the buzzword has been saved.
+		}
+	}
+
+}
+
+//------ The following generates the actual content.
+if (isApprovedDI($_SESSION[profileID])) echo "<p>You hold an Approved DI status.<br/>Your detail is available for the learners to lookup.</p>"; //------ If the Driving Instructor is an approved DI, it acknowledge that by outputting this message.
+else echo "<p>Your status as a DI is pending approval.<br/>After you have been approved, you will be available for the learners to view and pick from.</p>"; //------ If the DI is pending approval, it displays that with this.
+
+$feeDetails = getFeeDetailsFromDIID($_SESSION[profileID]); // This retrieves the fee details set by the driving instructor.
+
+//------ If the fee hasn't been set yet, it displays the following message directing the user to the page where the fee can be assigned.
+if (!$feeDetails[0][fee_active])
+	echo "<div class = \"negative\"><p>You currently have no fee set. Click <a href = \"?p=fee\">here</a> to assign a fee or your clients will be unable to make purchases.</div>";
+
+//------ The following retrieves the current buzzword from the database and displays it to the user.
+if ($theBuzzword = getBuzzword($_SESSION[profileID])) echo "<p>Your active buzzword is <b>$theBuzzword</b>. To make sure no one links to your profile without authorization, please change your buzzword on a regular basis.</p>";	
+	else echo "<div class = \"negative\"><p>You currently have no buzzword set. We will not proceed with the approval process until you have done so.</div>"; //------ If there is no buzzword set, it alerts the user to set a buzzword and the consequence of not setting one.
+
+
+		
+
+
+
+?>
+		<!-- The following is the form for the DI to make entry into if they want to create or change the buzzword. -->
+		<p>Please enter a new buzzword below if you haven't got one or wish you change it.
+		Make sure its memorable as it is for you to give to your clients when they call you for it and you wish to associate with them.<br/>
+		Be warned though that your profile will need verifying by the Administrator.</p>
+		<form method="POST" action="?p=welcomePage">
+			<input type="text" name="di_buzzword" size="10" value="<?=$_POST[di_buzzword]?>" maxlength="10"><input type="submit" value="Submit Buzzword!" name="buzzword_submit">
+		</form>
+		<?php
+bodyFooter();
+
+?></td>
+	</tr>
+</table>

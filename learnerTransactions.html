@@ -1,0 +1,73 @@
+<?php
+bodyHeader("Transactions",2);
+
+if ($theDI = getDIIDFromLearnerID($_SESSION[profileID])) {	//------ Retrieve the DI who the learner is associated to and continue if the association is found
+
+	$output = "";	//------ Reset the content of the output to blank
+	$grandNetTotal = 0;	//------ Reset the grand Net Total to 0.
+	
+	if ($theTransactions = getTransactionsBetween ($_SESSION[profileID], $theDI)){	//------ Retrieve the transactions that took place between the specified learner driver and the DI and continue if they exist
+		foreach ($theTransactions as $transaction){	//------ Retrieve the account of the transactions one at a time
+			//------ Assign the details of the transaction to the local variables
+			$transactionID = $transaction[transaction_id];
+			$transactionAmount = $transaction[transaction_amount];
+			$transactionDateTime = date("jS M 'y",strtotime($transaction[transaction_date_time]));
+			$feeID = $transaction[fee_id];
+		
+			$feeAmount = number_format(getFeeAmount($feeID),2);	//------ Format the amount to 2 decimal places
+			$investment = number_format($transactionAmount	*	$feeAmount,2);	//------ Work out the total amount invested to 2 decimal places. 
+			
+			$discount = number_format(getApplicableDiscount ($feeID, $transactionAmount),2);	//------ Retrieve the applicable discount and format it to 2 decimal places
+			$netTotal = number_format($investment - discount($investment, $discount),2);	//------ Work out the net total and format it to 2 decimal places
+			$grandNetTotal+= $netTotal;	//------ Increment the grandNetTotal by the amount contained in the netTotal
+			
+			//------ Generate the output containing the detail of the transaction
+			$output.=	"	<tr>".
+						"		<td align=\"center\" bgcolor=\"#99CFB0\">$transactionID</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"left\">$transactionDateTime</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"center\">$transactionAmount</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"right\">£$feeAmount</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"right\">£$investment</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"left\">$discount%</td>".
+						"		<td bgcolor=\"#99CFB0\" align=\"right\">£$netTotal</td>".
+						"	</tr>";
+		}
+		
+		//------ Embed the header and enclose the list the transactions inside the table tags.
+		$output = 	"<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">".
+					"	<tr>".
+					"		<td align=\"center\" bgcolor=\"#6CB89C\">Transaction ID</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"left\">Date</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"center\">Credit(s) Purchased</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"right\">Fee Per Lesson</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"right\">Gross Investment</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"left\">Discount</td>\n".
+					"		<td bgcolor=\"#6CB89C\" align=\"right\">Net Investment</td>\n".
+					"	</tr>".
+					"	$output".
+					"</table>";			
+		
+		//------ Append another table giving a summary of the transactions
+		$output.=	"<br/><table border=\"0\" cellspacing=\"5\" cellpadding=\"5\">".
+					"	<tr>".
+					"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Grand Net Investment</td>".
+					"		<td bgcolor=\"#6CB89C\">£".number_format($grandNetTotal,2)."</td>".
+					"	</tr>".
+					"	<tr>".
+					"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Total Credits Purchased</td>".
+					"		<td bgcolor=\"#6CB89C\">".getTotalCreditsPurchased($_SESSION[profileID],$theDI)."</td>".
+					"	</tr>".
+					"	<tr>".
+					"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Remaining Client Credit</td>".
+					"		<td bgcolor=\"#6CB89C\">".getRemainingLearnerCredit($_SESSION[profileID])."</td>".
+					"	</tr>".
+					"</table>";
+	} else {
+		$output = "There is no record of any transactions...";	//------ If there are no transactions to show, output this message
+	}
+	
+	echo $output;	//------ Output the transactions
+} else echo "This account is not associated with a DI. Please <a href = \"?p=welcomePage\">click here</a> and follow the instructions on the right hand side.";	//------ If the account is not associated with a DI, show this message
+
+bodyFooter();
+?>

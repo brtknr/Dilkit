@@ -1,0 +1,135 @@
+<?php
+bodyHeader("Clients",2);
+?>
+<input type="button" value="Current Clients" onclick="toggleVisibility('currentClients');" id="toggleForm">
+<input type="button" value="Passed Clients" onclick="toggleVisibility('passedClients');" id="toggleForm">
+<br/><br/>
+<?php
+$db = new database; //------ Establish connection with the database
+
+if ($_POST[learner_passoff]){	//------ If a request to pass off a learner has been sent, proceed with the content of IF
+	$learnerID = $_POST[learner_id];
+	$q = 	"UPDATE `dilkit`.`learner` SET `learner_passed` = '1' WHERE `learner_id` = '$learnerID' LIMIT 1;";						
+	$db->rawQuery($q);	//------ Query the database to update the status of the learner as passed
+	$currentClientsAlert = "The learner has been passed off.";	//------ Show this alert message
+	$visibleAtLoad = "currentClients";	//------ When the page loads, show the Current Clients
+}
+
+$currentClients = "";	//------ Reset the content to blank
+$passedClients = "";	//------ Reset the content to blank
+
+if ($profiles = getClientProfiles($_SESSION[profileID])){	//------ If there are clients associated with the DI, proceed with the content of IF
+	$currentClientsBgColorToggle = false;
+	$passedClientsBgColorToggle = false;
+
+	foreach ($profiles as $profile){
+		//------ Initialize all the profile content to the specified variables
+		$profileID = $profile[profile_id];
+		$profileName = $profile[profile_name];
+		$profileHouseNo = $profile[profile_houseno];
+		$profilePostcode = $profile[profile_postcode];
+		$profileTelephone = $profile[profile_telephone];
+		$profileEmail = $profile[profile_email];
+		$profilePassword = $profile[profile_password];
+		$profileActive = $profile[profile_active];
+		$profileUpdated = date("jS M 'y, g:ia",strtotime($profile[profile_updated]));
+		$theLearnerID = $profile[learner_id];
+
+		$form = "				<form method=\"POST\" action=\"?p=clients\" onsubmit=\"return confirm('This is irreversible! Are you sure?')\"><input type=\"hidden\" value=\"$theLearnerID\" name=\"learner_id\"><input type = \"submit\" name = \"learner_passoff\" value = \"Pass 'em off!\"></form>"; //------ This is the default form
+			
+		if (!$profileActive){	//------ If the profile has been suspended by the administrator, set the visual format as negative
+			$theClass = " class = \"negative\"";
+		}
+		
+		if (hasPassed($profileID)){	//------ If the client has passed, add the client to the list for Passed Clients
+			$theBGColor = $passedClientsBGColorToggle?"99CFB0":"6CB89C";
+			$passedClientsBGColorToggle = !$passedClientsBGColorToggle;
+
+			$passedClients.=	"	<tr>".
+						"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+						"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+						"			<tr>".
+						"				<td><div$theClass><b>$profileName</b> updated <i>$profileUpdated</i></div></td>".
+						"			</tr>".
+						"			<tr>".
+						"				<td>^<u>$profileHouseNo $profilePostcode</u> #<u>$profileTelephone</u> @<u>$profileEmail</u></br>".
+						"				</td>".
+						"			</tr>".
+						"		</table>".
+						"		</td>".
+						"	</tr>";
+		} else {	//------ If the client hasn't been passed, add them to the current client list.
+			$theBGColor = $currentClientsBGColorToggle?"99CFB0":"6CB89C";
+			$passedClientsBGColorToggle = !$currentClientsBGColorToggle;
+
+			$currentClients.=	"	<tr>".
+						"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+						"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+						"			<tr>".
+						"				<td><div$theClass><b>$profileName</b> updated <i>$profileUpdated</i></div></td>".
+						"			</tr>".
+						"			<tr>".
+						"				<td>^<u>$profileHouseNo $profilePostcode</u> #<u>$profileTelephone</u> @<u>$profileEmail</u></br>".
+						$form.
+						"				</td>".
+						"			</tr>".
+						"		</table>".
+						"		</td>".
+						"	</tr>";
+		}
+	}
+	if ($currentClients){	//------ Add the table tags if the current client list isn't empty
+		$currentClients = 	"<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n".
+					"	<tr>\n$currentClients\n".
+					"	</tr>\n".
+					"</table>\n";
+	} else {	//------ If there are no current clients
+		$currentClients = "You currently don't have any clients.";
+	}
+	
+	if ($passedClients){	//------ Add the table tags if the passed client list isn't empty
+		$passedClients = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n".
+					"	<tr>\n$passedClients\n".
+					"	</tr>\n".
+					"</table>\n";
+	} else {	//------ If there are no passed clients
+		$passedClients = "None of your clients have passed yet.";
+	}
+} 
+
+if (!$currentClients&&!$passedClients) {	//------ If the DI has no clients, show these messages.
+	$currentClients = "You currently don't have any clients.";
+	$passedClients = "You've never had any clients to pass.";
+}
+?>
+<!-- Output the current clients -->
+<div id = "currentClients">
+<?=$currentClientsAlert?>
+<?=$currentClients?>
+</div>
+
+<!-- Output the passed clients -->
+<div id = "passedClients">
+<?=$passedClients?>
+</div>
+
+<div id = "default">
+Please choose what you want to view.
+</div>
+
+<script name="Javascript">
+function toggleVisibility(what){ // This toggles the visibility of the content of the DIV tags so only one particular section is visible at a time
+	document.getElementById('currentClients').style.display='none';
+	document.getElementById('passedClients').style.display='none';
+	document.getElementById('default').style.display='none';
+	document.getElementById(what).style.display='block';
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>"; // If no specific content has been set to load up at startup, the default content is displayed.
+
+// This function executes when the page loads
+toggleVisibility(visibleAtLoad);
+</script>
+<?php
+bodyFooter();
+?>

@@ -1,0 +1,114 @@
+<?php
+bodyHeader("User Profiles",2);
+
+$db = new database;	//------ Establish connection with the database.
+
+if ($_POST[profile_kill]){	//------ If a request to deactivate the profile has been made, proceed.
+	$theProfileID = $_POST[profile_id];	//------ Retrieve the profile ID
+	$q = 	"UPDATE `dilkit`.`profile` SET `profile_active` = '0' WHERE `profile_id` = '$theProfileID' LIMIT 1;";
+			
+	$db->rawQuery($q);	//------ Query the database table
+	echo "The profile has been suspended.";	//------ Output the message acknowledging the deactivation
+} else if ($_POST[profile_reactivate]){	//------ If a request to reactive a profile has been made, proceed
+	$theProfileID = $_POST[profile_id];	//------ Retrieve the profile ID
+	$q = 	"UPDATE `dilkit`.`profile` SET `profile_active` = '1' WHERE `profile_id` = '$theProfileID' LIMIT 1;";						
+			
+	$db->rawQuery($q);	//------ Query the database table
+	echo "The news article has been reactivated.";	//------ Output the message acknowledging the activation
+}
+
+$DIs = "";	//------ Reset the content of the DI list to blank
+$learners = "";	//------ Reset the content of the learners list to blank
+
+if ($profiles = getProfiles()){	//------ Retrieve the list of profiles and proceed if it is not empty.
+	$DIBGColorToggle = false;
+	$LearnerBgColorToggle = false;
+	$output = "";	//------ Reset the content of the general output to null
+	foreach ($profiles as $profile){	//------ Retrieve the content of the list one at a tile
+		//------ Assign the content of the profile details to the local variables.
+		$profileID = $profile[profile_id];
+		$profileName = $profile[profile_name];
+		$profileHouseNo = $profile[profile_houseno];
+		$profilePostcode = $profile[profile_postcode];
+		$profileTelephone = $profile[profile_telephone];
+		$profileEmail = $profile[profile_email];
+		$profilePassword = $profile[profile_password];
+		$profileActive = $profile[profile_active];
+		$profileUpdated = date("jS M 'y, g:ia",strtotime($profile[profile_updated]));
+		$theLearnerID = $profile[learner_id];
+		
+		//------ Create the button that allows suspension
+		$theClass = "";
+		$form = "				<form method=\"POST\" action=\"?p=userProfiles\"><input type=\"hidden\" value=\"$profileID\" name=\"profile_id\"><input type = \"submit\" name = \"profile_kill\" value = \"Suspend!\"></form>";
+			
+		if (!$profileActive){	//------ If the profile is already suspended, show the button that allows reactivation.
+			$theClass = " class = \"negative\"";
+			$form = "				<form method=\"POST\" action=\"?p=userProfiles\"><input type=\"hidden\" value=\"$profileID\" name=\"profile_id\"><input type = \"submit\" name = \"profile_reactivate\" value = \"Reactivate!\"></form>";
+		}
+
+		$theUserRank = getUserRank($profileID);	//------ Determine whether the user is a learner driver or a DI
+		
+		if ($theUserRank == "di"){	//------ If the user is a Driving Instructor, proceed.
+			$theBGColor = $DIBGColorToggle?"99CFB0":"6CB89C";
+			$DIBGColorToggle = !$DIBGColorToggle;
+			
+			$DIbuzzword = getBuzzword ($profileID);
+
+			//------ Add the content to the list of DIs.
+			$DIs.= 		"	<tr>".
+						"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+						"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+						"			<tr>".
+						"				<td><div$theClass><b>$profileName</b> updated <i>$profileUpdated</i></div></td>".
+						"			</tr>".
+						"			<tr>".
+						"				<td>^<u>$profileHouseNo $profilePostcode</u> #<u>$profileTelephone</u> @<u>$profileEmail</u></br>".
+						$form.
+						"				</td>".
+						"			</tr>".
+						"		</table>".
+						"		</td>".
+						"	</tr>";
+						
+		} elseif ($theUserRank == "learner"){	//------ If the user is a learner driver, proceed.
+			$theBGColor = $LearnerBGColorToggle?"99CFB0":"6CB89C";
+			$LearnerBGColorToggle = !$LearnerBGColorToggle;
+
+			//------ Add the content to the list of learners.
+			$learners.=	"	<tr>".
+						"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+						"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+						"			<tr>".
+						"				<td><div$theClass><b>$profileName</b> updated <i>$profileUpdated</i></div></td>".
+						"			</tr>".
+						"			<tr>".
+						"				<td>^<u>$profileHouseNo $profilePostcode</u> #<u>$profileTelephone</u> @<u>$profileEmail</u></br>".
+						$form.
+						"				</td>".
+						"			</tr>".
+						"		</table>".
+						"		</td>".
+						"	</tr>";
+		}
+
+	}
+	
+	//------ Enclose the list of learners and driving instructors in 2 different columns.
+	$output = 	"<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n".
+				"	<tr>\n".
+				"		<td valign = \"top\"><h3>Driving Instructors</h3>\n".
+				"			<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\">$DIs</table>\n".
+				"		</td>\n".
+				"		<td valign = \"top\"><h3>Learners</h3>\n".
+				"			<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\">$learners</table>\n".
+				"		</td>\n".
+				"	</tr>\n".
+				"</table>\n";
+} else {
+	$output = "There are no profiles available to show.";	//------ If there are no profiles available to show, output this.
+}
+
+echo $output;	//------ Output the list.
+
+bodyFooter();
+?>

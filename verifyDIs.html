@@ -1,0 +1,62 @@
+<?php
+bodyHeader("Verify Driving Instructors",2);
+
+$output = "";	//------ Reset the content of the output to blank
+
+if ($_POST[di_approve]){	//------ If a request has been submitted to approve a DI, proceed.
+	$theProfileID = $_POST[profile_id];	//------ Retrieve the profile ID of the subjected DI.
+	
+	$db = new database;	//------ Establish connection with the database.
+	
+	$q = 	"UPDATE `dilkit`.`di` SET `di_approved` = '1' WHERE `di_id` = '$theProfileID' LIMIT 1;";
+			
+	$db->rawQuery($q);	//------ Query the database requesting update of the DI's status as approved.
+
+	echo "<p>The DI's status has been changed to Approved.</p>";	//------ Output a message acknowledging this.
+}
+
+if ($thePendingDIList = getPendingDIList()){	//------ Get the list of pending driving instructors and proceed if there are any.
+	$bgColorToggle = false;
+	foreach ($thePendingDIList as $theItem){	//------ Retrieve the DI one at a time
+		
+		list ($theProfileID, $theDIName, $theDIBuzzword,$theDITelephone, $theDIEmail, $thePostcode) = $theItem;	//------ Assign the information about the DI to local variables.
+
+		$theBGColor = $bgColorToggle?"99CFB0":"6CB89C";
+		$bgColorToggle = !$bgColorToggle;
+
+		$theForm = "<form method=\"POST\" action=\"?p=verifyDIs\"><input type=\"hidden\" value=\"$theProfileID\" name=\"profile_id\"><input type = \"submit\" name = \"di_approve\" value = \"Approve!\"></form>";	//------  This code generates the button as well as the information required to allow approval of DIs
+		
+		if ($theDIBuzzword)	$theDIBuzzword = "Buzzword: $theDIBuzzword";	//------ If the DI has a buzzword set, show the buzzword.
+		else {	//------ If the DI doesn't have a buzzword set, replace the form with the following message.
+			$theForm = "The DI needs to set a buzzword before they can be verified.";
+			$theDIBuzzword = "<div class = 'negative'>No Buzzword Set!</div>";
+		}
+	
+		//------ Generate the output with detail of information about the driving instructor.
+		$output.= "	<tr>".
+		"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+		"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+		"			<tr>".
+		"				<td><b>$theDIName</b> </td>".
+		"			</tr>".
+		"			<tr>".
+		"				<td>^<u>$thePostcode</u> #<u>$theDITelephone</u> @<u>$theDIEmail</u></br>".
+		"				$theDIBuzzword".
+		"				$theForm</td>".		
+		"			</tr>".
+		"		</table>".
+		"		</td>".
+		"	</tr>";
+	}
+	//------ Enclose the list DI's to verify within the table tags.
+	$output = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n"
+	.$output
+	."</table>\n";
+} else {
+	$output = "There are currently no DIs pending approval.";	//------ Output this message if there are no DIs pending approval.
+}
+	
+echo $output;	//------ Output the content of the variable.
+	
+bodyFooter();
+?>

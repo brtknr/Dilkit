@@ -1,0 +1,196 @@
+<?php
+bodyHeader("Publisher",2);
+?>
+<!-- These buttons allow switching between the different factions of publishing news. -->
+<input type="button" value="Add News" onclick="toggleVisibility('addNews');" id="toggleForm">
+<input type="button" value="Active News" onclick="toggleVisibility('activeNews');" id="toggleForm">
+<input type="button" value="Archive" onclick="toggleVisibility('archive');" id="toggleForm">
+<br/><br/>
+<?php
+$db = new database; //------Establish connection with the database
+
+if ($_POST[news_submit]){	//------If any news have been submitted via the form, run the enclosed sequence of actions
+	$visibleAtLoad = "addNews";	//------ When the page loads, show the interface that allows adding of news.
+
+	$postAlert = "";	//------ Resets the content of the alerts related to posting of news to blank
+	
+	if (!$theNewsID = getNextID("news")) $theNewsID = 10000;	//------ Get the next news ID and if no news have been submitted yet, assign 10000 to the ID
+	$theNewsTitle = trim($_POST[news_title]);	//------ Get the title of the news
+	$theNewsContent = nl2br(trim($_POST[news_content]));	//------ Get the content of the news
+	
+	$theTitleDifference = strlen($theNewsTitle) - 100;	//------ Get, by how many characters the title is too long
+	$theContentDifference = strlen($theNewsContent) - 1000;	//------ Get, by how many characters the content is too long
+	
+	if (!$theNewsTitle) $postAlert.= "Title (you must specify a title.)\n";	//------ If the title of the news is blank, show this message
+	if ($theTitleDifference > 0) $postAlert.= "Title (it is too long by $theTitleDifference character(s))\n";	//------ If the title is too long, show how many characters by which it is too long
+	if (!$theNewsContent) $postAlert.= "Content (you must have something in the content.)\n";	//------ If the content of the news is blank, show this message.
+	if ($theContentDifference > 0) $postAlert.= "Content (it is too long by $theContentDifference character(s))\n";	//------ If the content of the news is too long, show how many characters by which it exceeds the quota
+	
+	if (!$postAlert){	//------ If no errors have been assigned....
+		$q = 	"INSERT INTO `dilkit`.`news` (`news_id`,".
+												"`news_title` ,".
+												"`news_content` ,".							
+												"`news_active`) ".
+				"VALUES ('$theNewsID','$theNewsTitle', '$theNewsContent', 1);";
+
+		$db->rawQuery($q);	//------ Query the database to enter the news into the database.
+		$postAlert = "The news article has been posted.";	//------ This message is displayed as acknowledgement
+		$_POST = null;	//------ Reset the content of the form.
+	}
+} else if ($_POST[news_archive]){	//------ If archiving of a particular news has been requested...
+	$visibleAtLoad = "activeNews";	//------ Show the active news section when the page becomes visible.
+	$theNewsID = $_POST[news_id];	//------ Get the news ID from the submission
+	$q = 	"UPDATE `dilkit`.`news` SET `news_active` = '0' WHERE `news_id` = '$theNewsID' LIMIT 1;";						
+			
+	$db->rawQuery($q);	//------ Query the database to set the status of the news to inactive
+	$activeNewsAlert = "The news article has been archived.";	//------ Display this message as acknowledgement
+} else if ($_POST[news_reactivate]){	//------ If some news has been requested to be reactivated,
+	$visibleAtLoad = "archive";	//------ Show the archive section during startup
+	$theNewsID = $_POST[news_id];	//------ Get the news ID from the submission
+	$q = 	"UPDATE `dilkit`.`news` SET `news_active` = 1, `news_posted` = NOW() WHERE `news_id` = $theNewsID LIMIT 1;";						
+			
+	$db->rawQuery($q);	//------ Update the database so the status of a particular news is set back to active and the date of postage is updated to the most recent.
+	$archiveAlert = "The news article has been reactivated.";	//------ Display this message as an acknowledgement.
+}
+?>
+<!-- Shows the section that allows adding of news -->
+<div id = "addNews">
+<?=nl2br($postAlert)?>
+<form name="publisherForm" method="POST" action="?p=publisher">
+	<table border="0" width="100%" cellspacing="5" cellpadding="5">
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Title</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="news_title" size="50" maxlength="1010" value="<?=$_POST[news_title]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Content</td>
+			<td bgcolor="#6CB89C">
+			<textarea rows="5" name="news_content" cols="49"><?=$_POST[news_content]?></textarea></td>
+		</tr>
+		<tr>
+			<td width = "50%">&nbsp;</td>
+			<td>
+			<input type="submit" value="Post it!" name="news_submit"></td>
+		</tr>
+	</table>
+</form>
+</div>
+<?php
+$newsContent = getActiveNews();	//------ Get all the active news
+
+if ($newsContent){	//------ If there are any active news, proceed...
+	$bgColorToggle = false;
+	$output = "";	//------ Reset the content of the output to blank
+	foreach ($newsContent as $article){
+		//------ Assign the row to internal variables
+		$newsid = $article[news_id];
+		$newsTitle = $article[news_title];
+		$newsContent = $article[news_content];
+		$newsPosted = date("jS M 'y, g:ia",strtotime($article[news_posted]));
+		
+		$theBGColor = $bgColorToggle?"99CFB0":"6CB89C";
+		$bgColorToggle = !$bgColorToggle;
+		
+		//------ Generate the output
+		$output.= "	<tr>".
+		"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+		"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+		"			<tr>".
+		"				<td><b>$newsTitle</b> posted on <i>$newsPosted</i></td>".
+		"			</tr>".
+		"			<tr>".
+		"				<td>$newsContent".
+		"				<form method=\"POST\" action=\"?p=publisher\"><input type=\"hidden\" value=\"$newsid\" name=\"news_id\"><input type = \"submit\" name = \"news_archive\" value = \"Archive it!\"></form>".
+		"				</td>".
+		"			</tr>".
+		"		</table>".
+		"		</td>".
+		"	</tr>";
+	}
+	//------ The output is enclosed inside a table.
+	$output = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n$output\n</table>";
+	
+	$activeNews = $output;	//------ The output is assigned to the activeNews Variable.
+} else {	//------ The following message is assigned if there are no current news on display or to be displayed
+	$activeNews = "Nothing has been posted yet...";
+}
+?>
+<!-- Show the active news -->
+<div id = "activeNews">
+<?=$activeNewsAlert?>
+<?=$activeNews?>
+</div>
+<?php
+$newsContent = getArchivedNews();	//------ Get the archived news
+
+if ($newsContent){	//------ If the newsContent is not blank
+	$bgColorToggle = false;
+	$output = "";	//------ Reset the content of the output to blank
+	foreach ($newsContent as $article){
+		//------ Assign the row to internal variables
+		$newsid = $article[news_id];
+		$newsTitle = $article[news_title];
+		$newsContent = $article[news_content];
+		$newsPosted = date("jS M 'y, g:ia",strtotime($article[news_posted]));
+		
+		$theBGColor = $bgColorToggle?"99CFB0":"6CB89C";
+		$bgColorToggle = !$bgColorToggle;
+		
+		//------ Generate the output
+		$output.= "	<tr>".
+		"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+		"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+		"			<tr>".
+		"				<td><b>$newsTitle</b> posted on <i>$newsPosted</i></td>".
+		"			</tr>".
+		"			<tr>".
+		"				<td>$newsContent".
+		"				<form method=\"POST\" action=\"?p=publisher\"><input type=\"hidden\" value=\"$newsid\" name=\"news_id\"><input type = \"submit\" name = \"news_reactivate\" value = \"Reactivate!\"></form>".
+		"				</td>".
+		"			</tr>".
+		"		</table>".
+		"		</td>".
+		"	</tr>";
+	}
+	
+	//------ Enclose the output inside a table.
+	$output = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n"
+	.$output
+	."</table>\n";
+	
+	$archive = $output; //------ Assign the output to the archive  variable
+} else {	//------ If there are no archived news to show, show the following message.
+	$archive = "Nothing has been archived yet...";
+}
+?>
+<!-- Show the archived news -->
+<div id = "archive">
+<?=$archiveAlert?>
+<?=$archive?>
+</div>
+
+<!-- Shows the default message -->
+<div id = "default">
+Please choose a task you wish you carry out.
+</div>
+<?php
+	bodyFooter();
+?>
+
+<script name="Javascript">
+function toggleVisibility(what){ //------ This toggles the visibility of the various factions of publishing
+	document.getElementById('addNews').style.display='none';
+	document.getElementById('activeNews').style.display='none';
+	document.getElementById('archive').style.display='none';
+	document.getElementById('default').style.display='none';
+	document.getElementById(what).style.display='block';
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>"; // If no faction has been set to load at startup, the default one is shown.
+
+//------ This function executes when the page loads
+toggleVisibility(visibleAtLoad);
+</script>

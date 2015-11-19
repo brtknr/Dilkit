@@ -1,0 +1,185 @@
+<?php
+GLOBAL $validation;	//------ Retrieve the global variable
+
+bodyHeader("Your Settings",2);
+echo "<h3>Profile</h3>";	//------ Echo the subtitle
+
+if ($_POST[settings_submit]){	//------ If the changes in settings have been submitted, proceed
+	if (getPasswordMatch ($_SESSION[profileID], trim($_POST[settings_current_password]))){	//------ If the supplied password matches the user's password, proceed.
+		$db = new database;	//------ Establish connection with the database.
+		$error = "";	//------ Reset the errors to blank
+		$q = "";	//------ Reset the query to blank
+	
+		//------ Assign the content of the form to local variables
+		$houseno = strtoupper(trim($_POST[settings_houseno]));
+		$postcode = strtoupper(trim($_POST[settings_postcode]));
+		$telephone = trim($_POST[settings_telephone]);
+		$password = trim($_POST[settings_password]);
+	
+		//House No. validation
+		if ($houseno){
+			if (!ereg($validation[AlphaNumeric], $houseno)||strlen($houseno)>10){	//------ If the house number isnt alphanumeric or exceeds 10 characters in length, show the error
+				$error.= "House Number (permitted characters: numbers and alphabets) (max length: 10 characters)\n";
+			} else {	//------ If the variable conforms to the validation, add the changes to the query
+				$q = $q?"$q,":"";
+				$q.= " `profile_houseno` = '$houseno'";
+			}
+		}
+		
+		//Postcode validation
+		if ($postcode){
+			if (!ereg($validation[Postcode], $postcode)||strlen($postcode)>8){	//------ If the postcode doesnt represent the format of a postcode or exceeds 8 characters in length, show the following error.
+				$error.= "Postcode (permitted characters: alphabets and numbers) (max length: 8 characters) (must comply with UK postcode standard)\n";
+			} else {	//------ If the variable conforms to the validation, add the changes to the query
+				$q = $q?"$q,":"";
+				$q.= " `profile_postcode` = '$postcode'";
+			}
+		}
+	
+		//Telephone validation
+		if ($telephone){
+			if (!ereg($validation[Telephone], $telephone)){	//------ If the telephone number doesnt conform to the telephone validation or exceeds 11 digits in length, show the following error
+				$error.= "Telephone (permitted characters: numbers starting with 0) (length: 11 digits)\n";
+			} else {	//------ If the variable conforms to the validation, add the changes to the query
+				$q = $q?"$q,":"";
+				$q.= " `profile_telephone` = '$telephone'";
+			}
+		}
+		
+		// Password validation
+		if ($password){
+			if (!ereg($validation[AlphaNumeric], $password)||strlen($password)>10){	//------ If the password isnt alphanumeric or exceeds 10 characters in length, show the following error.
+				$error.= "Password (permitted characters: alphabets and numbers) (max length: 10 characters)\n";
+			} else {	//------ If the variable conforms to the validation, add the changes to the query
+				$q = $q?"$q,":"";
+				$q.= " `profile_password` = '$password'";
+			}
+		}
+	
+		if (!$error){	//------ If there are no errors, proceed
+			if ($q){	//------ If there is sub query representing what to change, proceed
+				$q = 	"UPDATE `dilkit`.`profile` SET $q WHERE `profile_id` = '$_SESSION[profileID]';";
+				if ($db->rawQuery($q)) echo "Your profile has been successfully updated.";	//------ Query the database and notify the user acknowledging the update.
+				$_POST = "";	//------ Reset the content of the form to blank
+			} else {
+				$error.= "Illegal request (there is nothing to update)\n";	//------ If nothing has been specified to be updated, show this.
+			}
+		}
+	} else	$error.= "Authorization Denied (sorry but the password you entered didn't match)\n";	//------ If the supplied password for verification doesnt match, show this.
+
+	if ($error)	echo nl2br("<b>Please correct the errors associated with the following properties:</b>\n".$error);		//------ If there are errors to do with invalid data, embed the header and output the message.
+}
+
+?>
+<!-- Form prompting the user what they want to change. -->
+<form name="settings_form" method="POST" action="?p=settings" onSubmit="return checkForm(this)">
+	<table border="0" width="100%" cellspacing="5" cellpadding="5">
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			House Number^</td>
+			<td bgcolor="#6CB89C">
+			<table border="0" width="100%" cellspacing="0" cellpadding="0">
+				<tr>
+					<td>
+			<input type="text" name="settings_houseno" size="10" maxlength="10" value="<?=$_POST[settings_houseno]?>"></td>
+					<td>
+					<p align="right">[<?=getProfileHouseNoFromID($_SESSION[profileID])?>]</td>
+				</tr>
+			</table>
+			</td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Postcode^</td>
+			<td bgcolor="#6CB89C">
+			<table border="0" width="100%" cellspacing="0" cellpadding="0">
+				<tr>
+					<td>
+			<input type="text" name="settings_postcode" size="8" maxlength="8" value="<?=$_POST[settings_postcode]?>"></td>
+					<td>
+					<p align="right">[<?=getProfilePostcodeFromID($_SESSION[profileID])?>]</td>
+				</tr>
+			</table>
+			</td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Telephone Number^</td>
+			<td bgcolor="#6CB89C">
+			<table border="0" width="100%" cellspacing="0" cellpadding="0">
+				<tr>
+					<td>
+			<input type="text" name="settings_telephone" size="11" maxlength="11" value="<?=$_POST[settings_telephone]?>"></td>
+					<td>
+					<p align="right">&nbsp;[<?=getProfileTelephoneFromID($_SESSION[profileID])?>]</td>
+				</tr>
+			</table>
+			</td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			New
+			Password^</td>
+			<td bgcolor="#6CB89C">
+			<input type="password" name="settings_password" size="10" maxlength="10" value="<?=$_POST[settings_new_password]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Current Password*</td>
+			<td bgcolor="#6CB89C">
+			<input type="password" name="settings_current_password" size="10" maxlength="10" value="<?=$_POST[settings_current_password]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%">
+			<p align="right">^At least one of these required<br>
+			[ ] Current record<br>
+			*The current password is required for confirmation</td>
+			<td>
+			<input type="submit" value="Update!" name="settings_submit"></td>
+		</tr>
+	</table>
+</form>
+<script name="javascript">
+function checkForm(thisForm){	//------ This form ensures that the user has filled in all the necessary fields before submitting.
+	submitThisForm = true;	//------ The form is set for submission by default.
+	errorList = "The following fields require correct completion:\n";	//------ This is the heading for the errors.
+
+	if (isEmpty(thisForm.settings_postcode.value) && isEmpty(thisForm.settings_telephone.value) && isEmpty(thisForm.settings_houseno.value)&&isEmpty(thisForm.settings_password.value)){	//------ If neither the postcode, the telephone number nor houseno fields have been filled in, output the following error and dont submit the form.
+		submitThisForm = false;
+		errorList+= "   You must fill in something you need to change.\n";
+	} else if (isEmpty(thisForm.settings_current_password.value)){	//------ If the current password hasnt been entered, dont submit the form and show the following error.
+		submitThisForm = false;
+		errorList+= "	Current Password\n";
+	}
+
+	if (!submitThisForm){	//------ If this has been changed to false, show the error message.
+		alert (errorList);
+	}
+
+	return submitThisForm;	//------ Return whether the form is to be submitted or not.
+}
+
+
+// Source for the Space Trimmer: http://www.aspdev.org/articles/javascript-trim/
+
+function trimSpaces(sString){	//------ This removes the white spaces in the specified string and returns it.
+	while (sString.substring(0,1) == ' '){
+		sString = sString.substring(1, sString.length);
+	}
+	while (sString.substring(sString.length-1, sString.length) == ' '){
+		sString = sString.substring(0,sString.length-1);
+	}
+	return sString;
+}
+
+function isEmpty(theString){	//------ This determines whether the supplied string is empty or not.
+	if (trimSpaces(theString)=="") {
+		return true;
+	} else {
+		return false;
+	}
+}
+</script>
+<?php
+bodyFooter();
+?>

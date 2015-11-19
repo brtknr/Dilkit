@@ -1,0 +1,12 @@
+Data actually being entered into the database
+Email address duplicate
+Register as a DI
+Register as a learner
+Check for broken links
+Check for cookie support
+Make sure inactive profiles are inaccessible
+
+getDIIDFromID
+getDIIDFromID
+
+`profile_id`

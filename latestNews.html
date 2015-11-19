@@ -1,0 +1,25 @@
+<?php
+$newsContent = getActiveNews(); //------ Pulls the active news from the database.
+
+if ($newsContent){ //------ Checks if there are in fact any latest news and proceeds if true.
+	$headerSize = 1; //------ This allows the title of the news to be displayed in varying size according to how recently the news was posted.
+	foreach ($newsContent as $article){ //------ Retrieves the news one at a time.
+		//------ Assigns the content of the news to the local variables.
+		$newsTitle = $article[news_title]; 
+		$newsContent = $article[news_content];
+		$newsPosted = date("jS M 'y, g:ia",strtotime($article[news_posted]));
+		
+		//------ This generates the content of the news
+		bodyHeader($newsTitle,$headerSize);
+		echo "<i>".$newsPosted."</i></br>";
+		echo "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$newsContent;
+		bodyFooter();
+		
+		if ($headerSize < 3) $headerSize++; //------ This changes the header size for the first 3 news entries.
+	}
+} else { //------ If there are no news to show, it shows the following message.
+	bodyHeader("Latest", 2);
+	echo "Nothing much has been happening lately.";
+	bodyFooter();
+}
+?>

@@ -1,0 +1,78 @@
+<?php
+bodyHeader("Track Progress",2);
+
+if ($theDI = getDIIDFromLearnerID($_SESSION[profileID])){ // Get the ID of the Driving Instructor the learner is associated with and proceed if the association is found.
+	$hours = array (8=>"8:00am",9=>"9:00am",10=>"10:00am",11=>"11:00am",12=>"12:00pm",13=>"1:00pm",14=>"2:00pm",15=>"3:00pm",16=>"4:00pm",17=>"5:00pm",18=>"6:00pm",19=>"7:00pm",20=>"8:00pm");
+	$now = time(); // Get the current time
+
+	$appointmentListOutput = ""; // Reset the content of the list of appointments to blank.
+	$continuousBooking = 0; // Reset the offset related to continuous bookings to 0.
+	
+	if ($appointments = getPastAppointments($_SESSION[profileID], $theDI)){ // Get the past appointments with the Driving Instructors.
+		$noOfAppointments = count($appointments);	//------ Count the number of appointments
+	
+		for ($appointmentCount = 0; $appointmentCount < $noOfAppointments; $appointmentCount++){	//------ Create a definite loop with the number of appointments as the cap, appointment count starts at 0 and increments by 1 every loop.
+			$theAppointment = $appointments[$appointmentCount];	//------ Retrieve the record indicated by the appointment count
+		
+			//------ Assign the details of the appointment
+			$theID = $theAppointment[appointment_id];
+			$theDate = $theAppointment[appointment_date];
+			$theDateInSeconds = strtotime($theDate);
+			$theHumanDate = date("l, jS F 'y", $theDateInSeconds);
+			$theHour = $theAppointment[appointment_hour];
+
+			
+			if (!$continuousBooking) $firstAppointmentID = $theID;	//------ If the appointment doesn't run consecutively with the previous appointment, the first appointment carries the appointment ID of the current appointment. This is useful when recording progresses for multiple appointment that run consecutively.
+	
+			if ($theHour + 1 == ($appointments[$appointmentCount+1][appointment_hour])&&$theDate == $appointments[$appointmentCount+1][appointment_date]&&$isCancelled == $appointments[$appointmentCount+1][appointment_cancelled]){ //If the next appointment directly follows this appointment, increment the value of $continuousBooking.
+				$continuousBooking++;
+			} else {
+				$theHourTo = $theHour + 1;	//------ Determines when the appointment is till.
+				$theHourFrom = $theHour - $continuousBooking;	//------ Determines when the appointment started by subtracting the offset value of continuousBooking from theHour variable.
+				$continuousBooking = 0;	//------ This is reset back to 0.
+	
+				$remainingTime = ($theDateInSeconds + ($theHourFrom * 60 * 60))- $now;	//------ This determines how long is left until the appointment in hours.
+				
+				if ($remainingTime < 0){	//------ Append the detail of the appointment to the list only if it has already taken place.
+					$appointmentListOutput.=	"			<tr>\n".
+												"				<td bgcolor=\"#6CB89C\" align=\"right\">$theHumanDate</td>\n".
+												"				<td bgcolor=\"#6CB89C\" align=\"center\">$hours[$theHourFrom]-$hours[$theHourTo]</td>\n".
+												"			</tr>\n";
+												
+					$theProgressList = "";	//------ Reset the content of the progress to blank.
+					
+					if ($progresses = getProgressFromAppointment($firstAppointmentID)){	//------ Retrieve the list of progress that has been recorded in the current appointment, proceed if it contains something.
+						foreach ($progresses as $theProgress){	//------ Retrieve the detail of progress made one at a time.
+							if ($theRemarks = $theProgress[progress_remarks]){	//------ If there is a remark that has been recorded, stylize it as italic.
+								$theRemarks = " - [<i>$theRemarks</i>]";
+							}
+							
+							$theProgressList.= "					<li>$theProgress[progress_rating_name] $theProgress[progress_type_name]$theRemarks.</li>\n";	//------ Add the detail of the progree to the list.
+						}				
+					} else $theProgressList.= "					<li><i>The DI hasn't made any entries of progress for this appointment.</i></li>\n";	//------ If no progresses have been recorded, show this message.
+					
+					//------ Generate the output containing the list of appointments.
+					$appointmentListOutput.=	"			<tr>\n".
+							"				<td bgcolor=\"#99CFB0\" colspan=\"2\">\n".
+							"				<ul>\n".
+							"					$theProgressList".
+							"				</ul>\n".
+							"				</td>\n".
+							"			</tr>\n";
+				}					
+			}
+		}
+	}
+
+	if (!$appointmentListOutput) $appointmentListOutput = "	You have never had any lessons with this DI yet.";	//------ If no appointments have taken place, show this message.
+	else {	//------ If they have taken place, enclose the list inside the table tags.
+		$appointmentListOutput = 	"		<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\">\n".
+									"			$appointmentListOutput\n".
+									"		</table>\n";
+	}
+
+	echo $appointmentListOutput;	//------ Output the list of appointments.
+} else echo  "This account is not associated with a DI. Please <a href = \"?p=welcomePage\">click here</a> and follow the instructions on the right hand side.";	//------ If the learner driver isn't associated with a DI, show this message.
+
+bodyFooter();
+?>

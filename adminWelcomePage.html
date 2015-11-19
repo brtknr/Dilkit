@@ -1,0 +1,30 @@
+<!-- This page is the landing page displayed after the Administrator logs in -->
+<head>
+<meta http-equiv="Content-Language" content="en-gb">
+</head>
+
+<table border="0" width="100%" cellspacing="0" cellpadding="0">
+	<tr>
+		<td><?php
+bodyHeader("Welcome",1);
+?> This is the site&#39;s administration panel. Here, you can:
+		<ul>
+			<li>Publish/archive news</li>
+			<li>Verify Driving Instructors</li>
+			<li>View/control the site users</li>
+		</ul>
+		<?php
+	bodyFooter();
+?> </td>
+		<td bgcolor="#6CB89C" valign="top"><?php
+bodyHeader("Notifications",2);		
+
+//------Shows whether there are any pending tasks such as verifying new driving instructors.
+if (getPendingDIList()) echo "You need to verify new DIs. Click <a href=\"?p=verifyDIs\">here</a> to continue.";
+else echo "You currently have no pending tasks.";
+
+?> <?php
+bodyFooter();
+?> </td>
+	</tr>
+</table>

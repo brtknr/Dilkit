@@ -1,0 +1,75 @@
+<?php
+bodyHeader("Login",2);
+
+$db = new database;	//------ Establish connection with the database
+
+if (($email = strtolower(trim($_POST[login_email])))&&($password = trim($_POST[login_password]))){	//------ Retrieves the supplied username and password from the submitted form
+	$error = "";	//------ Resets the content of the errors to be outputted to blank.
+
+	if (!$_COOKIE[PHPSESSID]){	//------ If the cookie is not set, generate the following error message because the session relies on cookies.
+		$error.= "Browser (cookie not supported: please enable cookie on your browser or switch to a cookie-compatiable browser)";
+	} else {
+		//------ Check information provided for authenticity
+		//------ Check email address
+		if ($profileID = getProfileIDFromEmail($email)){
+			//------ Checks if the profile is active
+				if (isActiveProfile($profileID)){
+					//------ Check Password
+					if (getPasswordMatch($profileID, $password)){
+						//------ Successful!
+						$_SESSION[profileID] = $profileID;
+						$_SESSION[userRank] = getUserRank($profileID);
+					} else {
+						$error.= "Password (authorization denied: the supplied password did not match)";
+					}
+		
+				} else {	//------ If the user is suspended by the administrator, show the following error message.
+					$error.= "Suspended Account (authorization denied: please <a href=\"?p=contact\">contact us</a> if you think this is a mistake.)";
+				}
+		} elseif (isAdmin ($email, $password)) {	//------ If the user is an administrator, assign the following profile ID and user rank to the user's session
+				$_SESSION[profileID] = "xxxxxx";
+				$_SESSION[userRank] = getUserRank($_SESSION[profileID]);
+		} else {	//------ If the user is not found, show the following error.
+			$error.= "Email Address (authorization denied: there was no record of any user associated with this email address)";
+		}
+	}
+
+
+	if ($error)	
+		echo nl2br("<b>Please correct the errors associated with the following properties:</b>\n".$error);	//------ If there are any errors, it indicates the errors after this message.
+}
+
+if ($_SESSION[userRank]=="di"||$_SESSION[userRank]=="learner"||$_SESSION[userRank]=="admin"){	//------ Check if the user is logged in and if they are, show the following message.
+?>
+You are logged in. Please click <a href="?p=welcomePage">here</a> to continue or wait to be automatically transferred.
+<script name = "javascript">
+setTimeout("document.location = '<?=$PHP_SELF?>?p=welcomePage'", 2000);//------ Redirect the user to their landing page.
+</script>
+<?php
+} else {//------ If the user is not logged in, show the following form to allow logging in.
+?>
+<form method="POST" action="?p=loginForm">
+	<table border="0" width="100%" cellspacing="5" cellpadding="5">
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			E-mail Address</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="login_email" size="30" maxlength="50" value="<?=$_POST[login_email]?>" onfocus="this.value='';"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Password</td>
+			<td bgcolor="#6CB89C">
+			<input type="password" name="login_password" size="10" maxlength="10" value="<?=$_POST[login_password]?>" onfocus="this.value='';"></td>
+		</tr>
+		<tr>
+			<td width = "50%">&nbsp;</td>
+			<td>
+			<input type="submit" value="Login" name="login_submit"></td>
+		</tr>
+	</table>
+</form>
+<?php
+}
+bodyFooter();
+?>

@@ -1,0 +1,113 @@
+<?php
+bodyHeader("Transactions",2);
+
+$divContent = "";	//------ Reset the list containt the DIV enclosed content to blank
+$hideList = "";	//------ Reset the commands that control the visibility of the DIV enclosed content to blank
+$dropDown = "";	//------ Reset the content of the client selection dropdown menu to blank
+
+if ($clientProfiles = getClientProfiles($_SESSION[profileID])){	//------ Retrieve the list of clients associated with this driving instructor
+
+	foreach ($clientProfiles as $theClient){	//------ Retrieve the client from the list one at a time
+		$output = "";	//------ Reset the content of the output to blank
+		$grandNetTotal = 0;	//------ Reset the grantNetTotal amount to 0.
+		
+		if ($theTransactions = getTransactionsBetween ($theClient[profile_id], $_SESSION[profileID])){	//------ Get the account of the transactions between this DI and the client and continue if it exists.
+			foreach ($theTransactions as $transaction){	//------  Retrieve the detail of the transaction one at a time
+				//------ Assign the details of the transaction to the local variables
+				$transactionID = $transaction[transaction_id];
+				$transactionAmount = $transaction[transaction_amount];
+				$transactionDateTime = date("jS M 'y",strtotime($transaction[transaction_date_time]));
+				$feeID = $transaction[fee_id];
+
+				$feeAmount = number_format(getFeeAmount($feeID),2);	//------ Work out the amount of fee to 2 decimal places
+				$revenue = number_format($transactionAmount	*	$feeAmount,2);	//------ Work out the revenue generated to 2 decimal places
+				
+				$discount = number_format(getApplicableDiscount ($feeID, $transactionAmount),2);	//------ Retrieve the discount applicable to the transaction at 2 decimal places
+				$netTotal = number_format($revenue - discount($revenue, $discount),2);	//------ Work out the netTotal to 2 decimal places
+				$grandNetTotal+= $netTotal;	//------ Increment the grand total by the net total
+				
+				//------ Generate the output containing the detail of the transaction
+				$output.=	"	<tr>".
+							"		<td align=\"center\" bgcolor=\"#99CFB0\">$transactionID</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"left\">$transactionDateTime</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"center\">$transactionAmount</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"right\">£$feeAmount</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"right\">£$revenue</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"left\">$discount%</td>".
+							"		<td bgcolor=\"#99CFB0\" align=\"right\">£$netTotal</td>".
+							"	</tr>";
+			}
+
+			//------ Embed the header and enclose the list of transactions inside a table.
+			$output = 	"<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">".
+						"	<tr>".
+						"		<td align=\"center\" bgcolor=\"#6CB89C\">Transaction ID</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"left\">Date</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"center\">Credit(s) Purchased</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"right\">Fee Per Lesson</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"right\">Gross Revenue</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"left\">Discount</td>\n".
+						"		<td bgcolor=\"#6CB89C\" align=\"right\">Net Revenue</td>\n".
+						"	</tr>".
+						"	$output".
+						"</table>";			
+			
+			//------ Embed another table containing the summary of the transaction
+			$output.=	"<br/><table border=\"0\" cellspacing=\"5\" cellpadding=\"5\">".
+						"	<tr>".
+						"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Grand Net Revenue</td>".
+						"		<td bgcolor=\"#6CB89C\">£".number_format($grandNetTotal,2)."</td>".
+						"	</tr>".
+						"	<tr>".
+						"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Total Credits Purchased</td>".
+						"		<td bgcolor=\"#6CB89C\">".getTotalCreditsPurchased($theClient[profile_id], $_SESSION[profileID])."</td>".
+						"	</tr>".
+						"	<tr>".
+						"		<td width=\"50%\" align=\"right\" bgcolor=\"#99CFB0\">Remaining Client Credit</td>".
+						"		<td bgcolor=\"#6CB89C\">".getRemainingLearnerCredit($theClient[profile_id])."</td>".
+						"	</tr>".
+						"</table>";
+		} else {
+			$output = "There is no record of any transactions...";	//------ Output this message if there are no transactions
+		}
+		
+		$divContent.= "<div id=\"$theClient[profile_id]\">\n$output\n</div>\n\n";	//------ Enclose the output so far inside the DIV tags so their visibility can be controlled. 
+		
+		$dropDown.= "<option value=\"$theClient[profile_id]\">$theClient[profile_name]</option>\n";	//------ Generate the option in the dropdown list for client selection
+		
+		$hideList.= "document.getElementById('$theClient[profile_id]').style.display='none';\n";	//------ Generate the command to control the visibility of the DIV enclosed contents
+	}
+
+	$divContent.= "<div id=\"default\">\nPlease choose a client.\n</div>\n\n";	//------ Embed the default content to the overall output
+} else {
+	$divContent= "This account isn't associated with any clients yet.";	//------ Show this message if there are no accounts associated to the driving instructor.
+}
+
+if ($dropDown) {	//------ If there is a list of clients, enclose them inside a form.
+$dropDown = "<form name=\"selectMenuForm\">".
+			"<select size=\"1\" name=\"clientChooser\" onChange=\"toggleVisibility(this.options[ this.selectedIndex].value)\">".
+			"<option value =\"default\">&nbsp;</option>".
+			$dropDown.
+			"</select></form>";
+}
+			
+echo $dropDown;	//------ Output the dropdown menu
+
+echo $divContent;	//------ Output the DIV enclosed content
+
+bodyFooter();
+?>
+
+<script name="Javascript">
+function toggleVisibility(what){	//------ This controls the visibility of the DIV enclosed content
+//------ The list that controls the visibility is  outputted here.
+<?=$hideList?>
+document.getElementById('default').style.display='none';
+document.getElementById(what).style.display='block';	//------ This make only the DIV content refered to by "what" visible
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>";	//------ If no content has been specified to be visible at startup, the default content is assigned.
+
+//------  This function executes when the page loads
+toggleVisibility(visibleAtLoad);
+</script>

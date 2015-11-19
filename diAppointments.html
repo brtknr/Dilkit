@@ -1,0 +1,161 @@
+<?php
+bodyHeader("Appointments",2);
+
+if ($currentClients = getCurrentClients($_SESSION[profileID])){ //------Proceeds if there are any clients linked to the Driving Instructor
+	$days = array (0=>"Sun",1=>"Mon",2=>"Tue",3=>"Wed",4=>"Thu",5=>"Fri",6=>"Sat");
+	$hours = array (8=>"8:00am",9=>"9:00am",10=>"10:00am",11=>"11:00am",12=>"12:00pm",13=>"1:00pm",14=>"2:00pm",15=>"3:00pm",16=>"4:00pm",17=>"5:00pm",18=>"6:00pm",19=>"7:00pm",20=>"8:00pm");
+	$advanceOffset = 1; //------ How many days in advance MUST the appointments be booked?
+	$noOfDays = 16;		//------ How many days in advance CAN the appointments be booked?
+	$now = time();		//------ Current time
+	$db = new database;	//------ Connects to the database
+	$fourtyEightHourList = ""; //------ List for appointments in the next 48 hours.		
+	$appointmentListOutput = "";	//------ List for appointments of the individual clients
+	$appointmentListOutputAlert = "";	//------ Alert that carries the message when cancellation request has been processed.
+		
+	if ($_POST[cancel_appointment]){	//------ Proceed if appointment cancellation request has been sent
+		$visibleAtLoad = $_POST[learner_id];	//------ What section to show when the page loads?
+		
+		if ($toCancel = $_POST[toCancel]){		//------ Specify the appointments to the variable if there are any to cancel.
+			foreach ($toCancel as $record){
+				$fields = explode(",",$record);
+				foreach($fields as $appointmentID){
+					$q = "UPDATE `appointment` SET `appointment_cancelled` = '1' WHERE `appointment_id` = '$appointmentID';";
+					$db->rawQuery($q);	//------ Query to the database.
+				}
+			}
+			$appointmentListOutputAlert = "The appointments have been cancelled.";	//------ Output the acknowledgement.
+		}
+	}
+	
+	foreach ($currentClients as $theClient){
+		$continuousBooking = 0;	//------ Offset variable for when there are continuously booked appointments.
+		
+		if ($appointments = getUpcomingAppointments($theClient[profile_id], $_SESSION[profileID])){	//------ Proceed if there are any appointments with this client
+			$noOfAppointments = count($appointments); //------ Count the number of appointments
+		
+			for ($appointmentCount = 0; $appointmentCount < $noOfAppointments; $appointmentCount++){//------ Loop for the number of appointment times
+				$theAppointment = $appointments[$appointmentCount];	//------ Assign the record containing the appointment.
+			
+				$theID = $theAppointment[appointment_id];	//------ Get the ID
+				$theDate = $theAppointment[appointment_date];	//------ Get the Date of the appointment
+				$theDateInSeconds = strtotime($theDate);	//------ Convert the Date into number of seconds since Jan 01 1970, 00:00:00
+				$theHumanDate = date("l, jS F 'y", $theDateInSeconds);	//------ Convert the Date into human friendly format
+				$theHour = $theAppointment[appointment_hour];	//------ Get the hour of the day when the appointment is
+				$isCancelled = $theAppointment[appointment_cancelled];	//------ Is the appointment marked as cancelled?
+		
+				if ($theHour + 1 == ($appointments[$appointmentCount+1][appointment_hour])&&$theDate == $appointments[$appointmentCount+1][appointment_date]&&$isCancelled == $appointments[$appointmentCount+1][appointment_cancelled]){ //------ Is the next appointment continuous with this appointment?
+					$continuousBooking++; //------ Add to the offset.
+					$theHiddenIDs.=",$theID";	//------ When the appointment is cancelled, this is to make sure the cancellation includes all the joint appointments.
+				} else {
+					$theHourTo = $theHour + 1;
+					$theHourFrom = $theHour - $continuousBooking;
+					$continuousBooking = 0;
+					$theCheckBox = ""; //------  Resets the checkbox value to blank.
+					$theStyle = "";
+					
+					$twoDays = 2 * 24 * 60 * 60;
+					$remainingTime = ($theDateInSeconds + ($theHourFrom * 60 * 60))- $now;	//------ Calculate the remaining time till the appointment
+					
+					if ($isCancelled){ //------  If the appointment is marked as cancelled, do this.
+						$theStyle = " class=\"negative\"";
+						$theCheckBox = "Cancelled!";
+					} else if ($remainingTime < $twoDays){ //------  If the appointment is due in less that 2 days, do this
+						if ($remainingTime > 0){ //------ If the appointment hasn't already taken place
+							$theCheckBox = round($remainingTime/(60 * 60))." hour(s) left!"; // The checkbox is replaced by the remaining time.
+							$fourtyEightHourList.=  "			<tr>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\">\n".
+													"				$theCheckBox</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"right\">$theHumanDate</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\">$hours[$theHourFrom]-$hours[$theHourTo]</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\">$theClient[profile_name] ^<u>$theClient[profile_houseno] $theClient[profile_postcode]</u></td>".
+													"			</tr>\n";		
+							}
+					} else {	//------ For all other cases, include a checkbox to allow cancellation
+						$theCheckBox = "<input type=\"checkbox\" name=\"toCancel[]\" value=\"$theID$theHiddenIDs\">";
+					}
+					
+					$theHiddenIDs = "";
+					
+					if ($theCheckBox){ // If the checkbox value contains anything, add to the appointment list
+						$appointmentListOutput.=	"			<tr>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\"$theStyle>\n".
+													"				$theCheckBox</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"right\"$theStyle>$theHumanDate</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\"$theStyle>$hours[$theHourFrom]-$hours[$theHourTo]</td>\n".
+													"			</tr>\n";
+					}
+				}
+			}
+		}	
+
+		if (!$appointmentListOutput){	//------ If the appointment list for the client is empty, show this message.
+			$divContent.= 	"<div id=\"$theClient[profile_id]\">\n".
+							"	This client hasn't booked any appointments with you yet.".
+							"</div>\n";
+		} else {	//------ If the appointment list isnt empty, add the  DIV tags. This is help indicate that particular section.
+			$divContent.= 	"<div id=\"$theClient[profile_id]\">\n".
+							"	<form name=\"appointmentViewForm\" method=\"POST\" action=\"?p=appointments\">\n".
+							"	<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\">\n".
+							"			$appointmentListOutput\n".
+							"			<tr>\n".
+							"				<td align=\"center\">\n".
+							"				<input type=\"hidden\" value=\"$theClient[profile_id]\" name=\"learner_id\">".						
+							"				<input type=\"submit\" value=\"Cancel!\" name=\"cancel_appointment\"></td>\n".
+							"				<td colspan=\"2\">\n".
+							"				A minimum notice of 48 hours is required prior to cancellation for a refund.</td>\n".
+							"			</tr>\n".
+							"	</table>\n".
+							"	</form>\n".
+							"</div>\n";
+		}
+				
+		$dropDown.= "<option value=\"$theClient[profile_id]\">$theClient[profile_name]</option>\n"; //------ This creates the client selection dropdown menu.
+		
+		$hideList.= "document.getElementById('$theClient[profile_id]').style.display='none';\n";	//------ This indicates that the content within the DIV tags are to be hidden during the painting of the interface
+	
+	}	
+	$divContent.= "<div id=\"default\">\nPlease choose a client to view all the appointments due with them.\n</div>\n\n";	//------ This is the default content that is displayed.
+} else {
+	$divContent = "This account isn't associated with any clients yet."; //------ If there are no clients associated with the DI, this is shown.
+}
+
+if ($dropDown) { //------  If there are clients to choose from, enclose the list into the form.
+$dropDown = "<form name=\"selectMenuForm\">".
+			"<select size=\"1\" name=\"clientChooser\" onChange=\"toggleVisibility(this.options[ this.selectedIndex].value)\">".
+			"<option value =\"default\">&nbsp;</option>".
+			$dropDown.
+			"</select></form>";
+}
+
+
+//------ The following outputs the appointments in the next 48 hours
+?>
+<h3>In the next 48 hours...</h3>
+<table border="0" cellspacing="5" cellpadding="5">
+	<?=$fourtyEightHourList?$fourtyEightHourList:"There are no appointments due in the next 48 hours."?>
+</table>
+<br/>
+<?php
+
+echo $dropDown; //------ Output the client selection dropdown menu
+
+echo $appointmentListOutputAlert; //------ Output the alert messages
+
+echo $divContent; //------ Output the content enclosed within the DIV tags
+
+bodyFooter();
+?>
+<script name="Javascript">
+
+function toggleVisibility(what){ // This function hides all the other content inside the DIV tags except for the one indicated by "what"
+// The hide list is outputted here
+<?=$hideList?> 
+document.getElementById('default').style.display='none';
+document.getElementById(what).style.display='block'; // Display the content of "what"
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>"; // If nothing is indicated for the $visibleAtLoad variable, default content is assigned.
+
+toggleVisibility(visibleAtLoad); // This function executes when the page loads
+</script>
+<p></p>

@@ -1,0 +1,78 @@
+<?php
+bodyHeader("Availability",2);
+$db = new database; //------ Connects to the database
+
+$days = array (0=>"Sun",1=>"Mon",2=>"Tue",3=>"Wed",4=>"Thu",5=>"Fri",6=>"Sat");
+$hours = array (8=>"8:00am",9=>"9:00am",10=>"10:00am",11=>"11:00am",12=>"12:00pm",13=>"1:00pm",14=>"2:00pm",15=>"3:00pm",16=>"4:00pm",17=>"5:00pm",18=>"6:00pm",19=>"7:00pm",20=>"8:00pm");
+$output = "";	//------ The output is reset to blank
+
+if ($_POST[save_availability]){	//------ If a request to save the availability is found, proceed with the enclosed procedure
+	$q = "DELETE FROM `dilkit`.`availability` WHERE `di_id` = '$_SESSION[profileID]';";
+	$db->rawQuery($q); //------ Request all the current availability of the DI to be removed from the database
+
+	for ($hourCount = 8; $hourCount < count($hours) + 7; $hourCount ++){	//------ Create an incremental loop of the hours
+		for($dayCount = 0; $dayCount < count($days); $dayCount++){	//------ Create an incremental loop of the days
+			if ($_POST[day][$dayCount][$hourCount]){ //------ Proceed if the the slot is indicated as available
+				$q = "INSERT INTO `dilkit`.`availability` (`availability_day`,`availability_hour`,`di_id`) VALUES ('$dayCount','$hourCount','".$_SESSION[profileID]."');";
+				$db->rawQuery($q); //------ Make the availability entry into the database
+			}
+		}
+	}
+	echo "The availability has been saved!";	//------ Outputs the indication that the availability has been saved
+}
+
+$availability = getAvailability ($_SESSION[profileID]);	//------ Get the list of where the DI has indicated as being available
+
+for ($hourCount = 8; $hourCount < count($hours) + 7; $hourCount ++){	//------ Create an incremental loop of the hours
+	//------ Create the output
+	$output.=	"		<tr>\n".
+				"			<td align=\"right\" bgcolor=\"#99CFB0\">\n".
+				"			".$hours[$hourCount]."-".$hours[$hourCount+1]."</td>\n";
+				
+		for($dayCount = 0; $dayCount < count($days); $dayCount++){	//------ If the slot has been indicated as available, tick the checkbox
+			$isChecked = $availability[$dayCount][$hourCount]?" checked":"";
+			
+			$output.=	"			<td align=\"center\" bgcolor=\"#6CB89C\">\n".
+						"			<input type=\"checkbox\" name=\"day[$dayCount][$hourCount]\" value=\"1\"$isChecked></td>\n";
+		}
+	$output.=	"		</tr>\n";
+	//------ End of output creation
+}
+?>
+<form name="availabilityForm" method="POST" action="?p=availability">
+	<table border="0" cellspacing="5" cellpadding="5">
+		<!-- The checkboxes in this row of the table allows the user to check or uncheck all the slots in that particular column. -->
+		<tr>
+			<td align="right" align="center" bgcolor="#99CFB0">Hour\Day</td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[0]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(0,this.checked)"></td>			
+			<td align="center" bgcolor="#99CFB0"><?=$days[1]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(1,this.checked)"></td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[2]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(2,this.checked)"></td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[3]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(3,this.checked)"></td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[4]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(4,this.checked)"></td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[5]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(5,this.checked)"></td>
+			<td align="center" bgcolor="#99CFB0"><?=$days[6]?><br />
+			<input type="checkbox" onclick="toggleMultiCheck(6,this.checked)"></td>
+		</tr>
+		<!-- The content is outputted here -->
+		<?=$output?>
+	</table>
+	<p><input type="submit" value="Save Availability!" name="save_availability"></p>
+</form>
+<?php
+bodyFooter();
+?>
+
+<script language="JavaScript">
+function toggleMultiCheck(day,isChecked){ //------ This function toggles between the checked and unchecked status of all the checkboxes in that column depending on the value of isChecked
+
+	for (i = 8; i <= 20; i++){
+		document.getElementsByName('day['+day+'][' + i + ']')[0].checked = isChecked;
+	}
+}
+</script>

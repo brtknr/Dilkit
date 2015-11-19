@@ -1,0 +1,88 @@
+<!-- This page serves as the landing page for when the learner logs in. -->
+<table border="0" width="100%" cellspacing="0" cellpadding="0">
+	<tr>
+		<td>
+		<table border="0" width="100%" cellspacing="0" cellpadding="0">
+			<tr>
+				<td><?php
+	bodyHeader("Welcome",1);
+?> This website is an online tool that acts as an easy and comprehensive medium 
+				via which a DI and a learner can communicate with each other. <?php
+	bodyFooter();
+?> </td>
+			</tr>
+			<tr>
+				<td><?php
+	bodyHeader("What can you expect from us?",2);		
+?>
+				<ul>
+					<li>Find your local DIs online</li>
+					<li>Book and manage your lessons online at your convenience</li>
+					<li>Track your progress as you go along</li>
+					<li>Contact your DI</li>
+					<li>24/7 help and support</li>
+				</ul>
+				<?php
+	bodyFooter();
+?> </td>
+			</tr>
+		</table>
+		</td>
+		<td bgcolor="#6CB89C" valign="top" width="50%"><?php
+bodyHeader("Notifications",2);
+
+if ($theBuzzword = trim(strtolower($_POST[di_buzzword]))){ //------ Retrieves the buzzword if it has been submitted and proceeds if it is not empty
+	
+	if (!$theDIID = getDIIDFromBuzzword($theBuzzword)) echo "<p>Buzzword (no match found: no DIs are associated with this buzzword) (solution: confirm with your DI and try again)</p>"; //------ Shows this message if there are no associated driving intructors
+	else {	//------ If a DI is associated with the supplied buzzword....
+		if (!isActiveProfile($theDIID)) echo "<p>This DI has been suspended by the administrator. Please choose another or <a href = \"?p=contactUs\">seek assistance</a>.</p>"; //------ Shows this message if the DI has been suspended
+		else {	//------ If the DI is not suspended...
+			if (!isApprovedDI($theDIID)) echo "<p>This DI is currently pending approval for legitimate contact information by the administrator. Please try again at later time.</p>"; //------ Shows this message if the DI is pending approval
+			else { //------ If the DI is not pending approval...
+				$db = new database;	//------ Establishes connection with the database
+				
+				$q = 	"UPDATE `dilkit`.`learner` SET `di_id` = '$theDIID' WHERE `learner_id` = '$_SESSION[profileID]' LIMIT 1;";
+					
+				$db->rawQuery($q); //------ Queries the database to update the Driving Instructor for the learner.
+				
+				echo "<p>Thank you for entering the buzzword. You have been successfully associated with the DI.</p>"; //------ Displays this message as acknowledgement
+			}		
+		}
+	}
+}
+
+$showBuzzwordForm = false;	//------ Resets the boolean to false so the form is not shown by default
+
+if ($theDI = getDIIDFromLearnerID($_SESSION[profileID])) {	//------ Get the Driving Instructor associated with the learner and proceed if it is found
+	echo "<p>Your DI is <b>".getProfileNameFromID($theDI)."</b>.</p>";
+	if (hasPassed($_SESSION[profileID])) echo "Your DI has indicated that you have passed your test. Congratulations!";	//------ Indicates that the learner has passed if passed
+	else {	//------ If the learner hasn't passed....
+		if (isActiveProfile($theDI)) {	//------ If the profile is active...
+			if (!isApprovedDI($theDI)) echo "<p>Your DI is currently pending approval for legitimate contact information by the administrator.</p>";	//------ Show this message if the DI is pending approval due to change in details.
+			
+			if ($credits = getRemainingLearnerCredit($_SESSION[profileID])) echo "<p>You can book $credits more lesson(s)</p>";	//------ If the user has credits, this shows the number of credits available
+			else echo "<div class = \"negative\">You have no credit to book more lessons.</div>";	//------ Shows this if the user has no credit available.
+			
+		} else {	//------ If the profile is not active, show the buzzword form and the following message.
+			echo "<div class = \"negative\">Your DI has been suspended by the administrator. Please choose another or <a href = \"?p=contactUs\">seek assistance</a>.</div>";
+			$showBuzzwordForm = true;
+		}
+	}
+} else { //------ Shows the following message as well as the buzzword form if the learner is not associated with any Driving Instructors
+	echo "<div class=\"negative\">You currently have no association with a DI.</div>";
+	$showBuzzwordForm = true;
+}
+if ($showBuzzwordForm){	//------ If the variable has been indicated as true, it shows the form that allows the user to enter the buzzword that will associate them with a DI.
+?>
+		<p>Please contact a DI and ask for the buzzword to form an association.</p>
+		<form method="POST" action="?p=welcomePage">
+			<input type="text" name="di_buzzword" size="10" value="<?=$_POST[di_buzzword]?>" maxlength="10"><input type="submit" value="Associate with the DI!" name="buzzword_submit">
+		</form>
+	<?php
+}
+
+bodyFooter();
+
+?></td>
+	</tr>
+</table>

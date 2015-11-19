@@ -1,0 +1,149 @@
+<table border="0" width="100%" cellspacing="0" cellpadding="0">
+	<tr>
+		<td valign="top"><?php
+$feeAlert = "";
+$offerAlert = "";
+
+$db = new database;	//------ Establish connection with the database.	//------ Establishes connection with the database
+
+if ($_POST[fee_newamount]){	//------ If the form has been submitted indicating the new amount of fee, proceed with the enclosed actions.
+	$newFeeAmount = $_POST[fee_newamount];	//------ Retrieve the fee amount from the submitted form.
+	
+	if (!($newFeeAmount > 0) || !($newFeeAmount < 100)){	//------ If the fee isn't within the boundary, show the following message.
+		$feeAlert.= "Out of bound (Fee Amount: it must lye between 0.01 and 99.99)\n";
+	} else {
+		killFeesWithDIID($_SESSION[profileID]);	//------ This de-activates all the fees and offers currently associated with the Driving Instructor
+				
+		if (!($newFeeID = getNextID("fee"))) $newFeeID = 100000;	//------ Get the next fee ID.
+		
+		$q = 	"INSERT INTO `dilkit`.`fee` (`fee_id`,`fee_amount`,`fee_active`,`di_id`) VALUES ('$newFeeID','$newFeeAmount',1,'$_SESSION[profileID]');";
+		$db->rawQuery($q);	//------ Submit the query to insert a new fee specification.
+		
+		$feeAlert = "The active fee has been modified.";	//------ Display this message as an acknowledgement.
+	}
+} else if ($_POST[offer_cap]&&$_POST[offer_percentage]){	//------ If the form has been submitted indicating offers for the active fee, proceed with the enclosed actions.
+	//------ Retrieve values from the submitted form.
+	$newOfferCap = $_POST[offer_cap];
+	$newOfferPercentage = $_POST[offer_percentage];
+	$feeDetails = getFeeDetailsFromDIID($_SESSION[profileID]);	
+	
+	if (!($newOfferCap > 0) || !($newOfferCap < 100)){	//------ If the offer doesn't lye within the boundary, show the follwing message.
+		$offerAlert.= "Out of bound (Lesson Cap: it must lye between 1 and 99)\n";
+	} else if (offerLessonCapExists($newOfferCap, $feeDetails[0][fee_id])){	//------ If an offer has already been assigned for the submitted lesson cap for the fee ID, show the following message.
+		$offerAlert.= "Duplicate entry (Lesson Cap: you already have a record containing this lesson cap)\n";
+	} else if (!($newOfferPercentage > 0) || !($newOfferPercentage < 100)){	//------ If the percentage value submitted doesn't lye within the boundary, display the following error message.
+		$offerAlert.= "Out of bound (Discount Percentage: it must lye between 0.01 and 99.99)\n";
+	} else if (!discountPercentageIsWithinBounday($newOfferPercentage,$newOfferCap, $feeDetails[0][fee_id])){	//------ If the submitted offer isn't consistent with the current offers in terms of being an intermediate between a better and a worse offer, show the following message.
+		$offerAlert.= "Violation of Integrity (Discount Percentage: it must fall between the better and the worse offer)\n";
+	}
+	
+	if (!$offerAlert){	//------ If there are no alerts to show....
+		$q = 	"INSERT INTO `dilkit`.`offer` (`offer_lesson_cap`,`offer_discount_percentage`,`fee_id`) VALUES ('$newOfferCap','$newOfferPercentage','".$feeDetails[0][fee_id]."');";
+		$db->rawQuery($q);	//------ Submit the new offer
+		
+		$offerAlert = "The offer has been added.\n";	//------ Show this message as an acknowledgement.
+	}
+}
+
+$feeAlert.= $feeAlert?"<br/>":"";
+
+$feeDetails = getFeeDetailsFromDIID($_SESSION[profileID]);	//------ Get the fee details of the Driving Instructor.
+
+if ($feeDetails[0][fee_active]){	//------ If the lastest fee entry is active, show the fee details.
+	$feeAlert.= "You are currently charging £".number_format($feeDetails[0][fee_amount],2)." per lesson.";
+} else {	//------ If it is not active, show the following message.
+	$feeAlert.= "You currently have not assigned any fee.";
+}
+bodyHeader("Fee",2);
+?>
+		<!-- Shows the form to assign or change the current fee -->
+		<form name="feeForm" method="POST" action="?p=fee">
+			<table border="0" width="100%" cellspacing="5" cellpadding="5">
+				<tr>
+					<td colspan="2" width="100%"><?=$feeAlert?> </td>
+				</tr>
+				<tr>
+					<td align="right" bgcolor="#99CFB0">£</td>
+					<td bgcolor="#6CB89C">
+					<input type="text" name="fee_newamount" size="5" maxlength="5" value="<?=$_POST[fee_newamount]?>"></td>
+				</tr>
+				<tr>
+					<td colspan="2">WARNING: changing this will remove all the current 
+					offers!</td>
+				</tr>
+				<tr>
+					<td>&nbsp;</td>
+					<td>
+					<input type="submit" value="Change Fee!" name="fee_change"></td>
+				</tr>
+			</table>
+		</form>
+		<?php
+bodyFooter();
+?> </td>
+		<td valign="top" bgcolor="#6CB89C"><?php
+bodyHeader("Offers",3);
+?>
+		<!-- Shows the form to assign new offers -->
+		<form name="offerForm" method="POST" action="?p=fee">
+			<table border="0" width="100%" cellspacing="5" cellpadding="5">
+				<?php
+if ($feeDetails[0][fee_active]){ //------ Shows the content of the form if the current fee is active
+	$offers = "";	//------ Resets the list of offers to blank
+	$offerDetails = getOfferDetailsFromFeeID($feeDetails[0][fee_id]);	//------ Gets the list of offers already present in the database table
+
+	if ($offerDetails){	//------ If there is anything on the list of offers, it executes the internal instructions.
+		foreach ($offerDetails as $theOffer){	//------ Retrieves the item from the list of offers one at a time
+			if ($theOffer[offer_lesson_cap] && $theOffer[offer_discount_percentage]){	//------ Continue if both cap and the percentage of the offer are above 0.
+				$discountAmount = discount($feeDetails[0][fee_amount], $theOffer[offer_discount_percentage]);	//------ Works out the currently equivalent of how much is actually redeemable by applying the percentage on the fee.
+				$offers.= "<li>£".number_format($feeDetails[0][fee_amount]-$discountAmount,2)." (".$theOffer[offer_discount_percentage]."% off) per lesson when minimum of $theOffer[offer_lesson_cap] lessons purchased</li>\n"; //------ Adds the detail of the offer to the list
+			}
+		}
+	}
+	
+	$offers = "<ul>$offers</ul>";	//------ Encloses the offers within these tags to create an unordered list.
+?>
+				<tr>
+					<td colspan="2">
+					<?=$offers?>
+					<?=$offerAlert?>
+					</td>
+				</tr>
+				<tr>
+					<td align="right" bgcolor="#99CFB0" bordercolor="#99CFB0">When 
+					the client purchases at least</td>
+					<td>
+					<input type="text" name="offer_cap" size="2" maxlength="2" value="<?=$_POST[offer_cap]?>"> 
+					lesson(s),</td>
+				</tr>
+				<tr>
+					<td align="right" bgcolor="#99CFB0" bordercolor="#99CFB0">give 
+					them</td>
+					<td>
+					<input name="offer_percentage" size="5" maxlength="5" value="<?=$_POST[offer_percentage]?>">% 
+					off per lesson.</td>
+				</tr>
+				<tr>
+					<td>
+					<p align="right">All the fields must be filled in.</p>
+					</td>
+					<td>
+					<input type="submit" value="Add Offer!" name="add_offer"></td>
+				</tr>
+				<?php
+} else { //------ If there are no active fees to apply the offer to, show the following message.
+?>
+				<tr>
+					<td colspan="2">There is no active fee to apply the offers to.
+					</td>
+				</tr>
+				<?php
+}
+?>
+			</table>
+		</form>
+		<?php
+bodyFooter();
+?> </td>
+	</tr>
+</table>

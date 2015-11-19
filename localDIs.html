@@ -1,0 +1,82 @@
+<?php
+$output = "";	//------ Reset the output content to blank
+$subjectPostcode = "";	//------ Reset the subject postcode to blank
+
+if ($subjectPostcode = trim(strtoupper($_POST[learnerPostcode]))){	//------ If the user has entered a postcode, retrieve the postcode and assign the title accordingly
+	$outputTitle = "Results for $subjectPostcode";
+} else if($_SESSION["userRank"]=="learner") {	//------ If the user is logged it, retrieve their postcode from their profile and assign the title accordingly
+	$subjectPostcode = getProfilePostcodeFromID($_SESSION[profileID]);
+	$outputTitle = "Local DIs in $subjectPostcode";
+}
+
+if ($subjectPostcode){	//------ If the variable isn't empty, proceed with the enclosed actions
+	if ($theDistanceList = getDistanceList($subjectPostcode)){	//------ Gets the location of all DIs in terms of how far away they are located relative to the supplied postcode
+		$bgColorToggle = false;
+		foreach ($theDistanceList as $theItem){
+			list ($theDIID, $theDIName, $theDITelephone, $theDIEmail, $thePostcode, $theDistance) = $theItem;	//------ Assign the row of data to the internal variables
+
+			$theBGColor = $bgColorToggle?"99CFB0":"6CB89C";
+			$bgColorToggle = !$bgColorToggle;
+			
+			//------ Create the output content
+			$output.= "	<tr>".
+			"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+			"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+			"			<tr>".
+			"				<td>$theDistance km away: <b>$theDIName</b></td>".
+			"			</tr>".
+			"			<tr>".
+			"				<td>^<u>$thePostcode</u> #<u>$theDITelephone</u> @<u>$theDIEmail</u></td>".
+			"			</tr>".
+			"		</table>".
+			"		</td>".
+			"	</tr>";
+		}
+		
+		//------ Encloses the rows of data in the following table
+		$output = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n"
+		.$output
+		."</table>\n";
+	} else {	//------ If no results were returned, show this
+		$output = "There were no results for this query.";
+	}
+}
+
+if ($output){
+//---------- Output Body
+	bodyHeader($outputTitle,2);
+	echo $output; //------ Output the results
+	bodyFooter();
+}
+
+if ($_SESSION[userRank] == "guest"){ //------ If the user is not logged in, allow entry of the postcode manually by showing the form below.
+//---------- Output Body
+bodyHeader ("Local DIs",2);
+?>
+<form name="localDIs" method="POST" action="?p=localDIs">
+	<table border="0" width="100%" cellspacing="0" cellpadding="0" height="400">
+		<tr>
+			<td width="100%" valign="top">
+			<table border="0" width="100%" cellspacing="5" cellpadding="5">
+				<tr>
+					<td width="50%" align="right" bgcolor="#99CFB0">Your 
+					Postcode</td>
+					<td bgcolor="#6CB89C">
+					<input type="text" name="learnerPostcode" size="10" maxlength="8" value="<?=$_POST[learnerPostcode]?>"></td>
+				</tr>
+				<tr>
+					<td width="50%">&nbsp;</td>
+					<td><input type="Submit" value="Lookup!" name="lookupSubmit"></td>
+				</tr>
+			</table>
+			</td>
+			<td>
+			<img border="0" src="images/map_gb.gif" width="300" height="400"></td>
+		</tr>
+	</table>
+</form>
+<?
+
+bodyFooter();
+}
+?>

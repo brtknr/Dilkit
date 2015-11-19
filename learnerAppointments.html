@@ -1,0 +1,247 @@
+<?php
+bodyHeader("Appointments",2);
+
+if (!hasPassed($_SESSION[profileID])){	//------ If the learner driver has yet to pass, proceed.
+	if ($theDI = getDIIDFromLearnerID($_SESSION[profileID])) {
+		if (isActiveProfile($theDI)) {	
+				$days = array (0=>"Sun",1=>"Mon",2=>"Tue",3=>"Wed",4=>"Thu",5=>"Fri",6=>"Sat");	//------ Assign the various days of the week alongside their numerical counterparts
+				$hours = array (8=>"8:00am",9=>"9:00am",10=>"10:00am",11=>"11:00am",12=>"12:00pm",13=>"1:00pm",14=>"2:00pm",15=>"3:00pm",16=>"4:00pm",17=>"5:00pm",18=>"6:00pm",19=>"7:00pm",20=>"8:00pm");	//------ Assign the various hours of the day alongside their numerical counterparts
+				$advanceOffset = 1;	//------ This is the minimum number of days in advance the appointments must be booked.
+				$noOfDays = 16;		//------ This is the maximum number of days in advance the appointments can be booked.
+				$now = time();	//------ Retrieve the current time
+				
+				$db = new database;	//------ Establish connection with the database.
+	
+				$appointmentSelectionOutput = "";	//------ Reset the content of the appointment selection form output to blank
+				$appointmentSelectionAlert = "";	//------ Reset the content of the alert related to making appointments to blank
+				$appointmentTitle = "";	//------ Reset the content of the appointment title to blank
+				
+				$appointmentListOutput = "";	//------ Reset the content of the list of appointments that have been booked to blank
+				$appointmentListOutputAlert = "";	//------ Reset the content of the alerts related to manipulating the booked appointments to blank
+
+				$availability = getAvailability ($theDI);	//------ Get the availability of the driving instructor	
+				
+				//------ The following conditions process any submission of forms.
+				
+				if ($_POST[book_appointment]){	//------ If a request has been made to book appointments, proceed.
+					$visibleAtLoad = "addAppointment";	//------ Show this section when the page loads
+	
+					$day = $_POST[day];	//------ Retrieve the array where all the appointment slots the learner driver wishes to book is specified. 
+						
+					for ($hourCount = 8; $hourCount < count($hours) + 7; $hourCount ++){	//------ Set off a finite loop where hour count is 8 and increment by 1 each loop until the hourCount exceeds the count of hours specified during initialization.
+						for($dayCount = $advanceOffset; $dayCount < $noOfDays + $advanceOffset; $dayCount++){	//------ Loop across all the days of the week
+							if ($timeOffset = $day[$dayCount][$hourCount]){	//------ Proceed if the particular slot was chosen to be booked.
+								$theDate = date("Y-m-d",$timeOffset);	//------ Determine the database friendly format of the date of the appointment
+								$theHumanDate = date("l, jS F 'y",$timeOffset);	//------ Determine the human friendly format of the date of the appointment
+								$weekDay = date("w",$timeOffset);	//------ Determine which day of the week the appointment is
+								
+								if (!$newAppointmentID = getNextID("appointment")) $newAppointmentID = 100000;	//------ Retrieve the next available appointment ID
+								
+								if ($availability[$weekDay][$hourCount]){	//	If the DI is available on that particular slot, proceed
+									if (!isBooked($hourCount, $theDate, $theDI)){	//------ If the slot isn't already booked, proceed
+										if (getRemainingLearnerCredit($_SESSION[profileID])){	//------ If the remaining credit is greater than 0, proceed.		
+											$q = "INSERT INTO `appointment` (`appointment_id`,`appointment_date`,`appointment_hour`,`appointment_cancelled`,`learner_id`,`di_id`) VALUES ('$newAppointmentID','$theDate','$hourCount',0,'$_SESSION[profileID]','$theDI');";
+	
+											if ($db->rawQuery($q)) $theAppointmentAlert = $hours[$hourCount]."-".$hours[$hourCount+1]." on ".$theHumanDate." (Booked!)<br/>\n";	//------ Query the database requesting insertion of the appointment and if successful, assign an output message acknowledging that the appointment has been successfully booked.
+											} else $theAppointmentAlert = "<div class='negative'>".$hours[$hourCount]."-".$hours[$hourCount+1]." on ".$theHumanDate." <div class='negative'>(Not Booked: No Remaining Credit!)</div>\n";	//------ If the learner has no remaining credit, make reference to the appointment and output saying the appointment wasn't booked.
+									} else $theAppointmentAlert = "<div class='negative'>".$hours[$hourCount]."-".$hours[$hourCount+1]." on ".$theHumanDate." (Not Booked: Someone else has already booked here!)</div>\n";	//------ If someone else has already booked that particular appointment, show this message.
+								} else $theAppointmentAlert = "<div class='negative'>".$hours[$hourCount]."-".$hours[$hourCount+1]." on ".$theHumanDate." <div class='negative'>(Not Booked: The DI is unavailable here!)</div>\n";	//------ If the DI isn't available on that particular slot, show this message.
+								$appointmentSelectionAlert.= "<li>$theAppointmentAlert</li>\n";	//------ Enclose the alert inside a list.
+							}			
+						}
+					}		
+					$appointmentSelectionAlert = $appointmentAlert?"Please make a note of the following:\n<ol>$appointmentAlert</ol>\nAlternatively, you can find them listed in the Appointments panel.":"";	//------ Enclose the alert to be outputted inside an ordered list.
+				
+				} else if ($_POST[cancel_appointment]){	//------ If a request has been made to cancel an appointment, proceed.
+					$visibleAtLoad = "appointments";	//------ Show the appointments tab when the page loads.
+					$toCancel = $_POST[toCancel];	//------ Retrieve the list of appointments that are to be cancelled.
+					if ($toCancel){	//------ If the list exists, proceed.
+						foreach ($toCancel as $record){	//------ Retrieve the appointment to be cancelled from the list one at a time.
+							$fields = explode(",",$record);	//------ In case there are continuous bookings, separate them into individual appointment IDs.
+							foreach($fields as $appointmentID){	//------ Retrieve the appointment ID one at a time
+								$q = "UPDATE `appointment` SET `appointment_cancelled` = '1' WHERE `appointment_id` = '$appointmentID';";
+								$db->rawQuery($q);	//------ Query the database table requesting the corresponding appointment to be marked as cancelled.
+							}
+						}
+						$appointmentListOutputAlert = "The appointments have been cancelled.";	//------ Output the message acknowledging that the appointments have been cancelled.
+					}
+				}
+							
+				//------ The generation of the actual form that allows appointments to be booked starts here.
+				//------ The following generates the header of the form.
+				$appointmentTitle = "<td align=\"right\" align=\"center\" bgcolor=\"#99CFB0\">Hour\Day</td>";	//------ This initiates the creation of the header for the form.
+		
+				for($dayCount = $advanceOffset; $dayCount < $noOfDays + $advanceOffset; $dayCount++){	//------ This loops through days where the appointments are available to be booked.
+					$timeOffset = $now + ($dayCount * 24 * 60 * 60);	//------ Work out the date of the appointment
+					$theDate = date("D, jS M",$timeOffset);	//------ Format the date in readable format
+					$appointmentTitle.= "<td align=\"center\" bgcolor=\"#99CFB0\">$theDate</td>";	//------ Embed the field onto the header.
+				}
+			
+				//------ The following generates the body of the form where checkboxes are available where the appointment can be booked.
+				for ($hourCount = 8; $hourCount < count($hours) + 7; $hourCount ++){	//------ Loop though the various hours of the day
+					//------ This assigns a new row to the table along with the indication of the hour of the day.
+					$appointmentSelectionOutput.=	"		<tr>\n".
+													"			<td align=\"right\" bgcolor=\"#99CFB0\">\n".
+													"			".$hours[$hourCount]."-".$hours[$hourCount+1]."</td>\n";
+					
+					for($dayCount = $advanceOffset; $dayCount < $noOfDays + $advanceOffset; $dayCount++){	//------ This loops through the days where the appointments are available to be booked.
+						$timeOffset = $now + ($dayCount * 24 * 60 * 60);	//------ Work out the date of the appointment
+						$theDate = date("Y-m-d",$timeOffset);	//------ Format the date in database friendly format
+						$weekDay = date("w",$timeOffset);	//------ Work out which day of the week the appointment is
+						
+						if ($availability[$weekDay][$hourCount]&&!isBooked($hourCount, $theDate, $theDI)){	//------ Check whether the DI is available and whether the lesson hasn't been booked by anyone else yet and append the cell containing the checkbox to the list of choices
+							$appointmentSelectionOutput.=	"			<td align=\"center\" bgcolor=\"#6CB89C\">\n".
+															"			<input type=\"checkbox\" name=\"day[$dayCount][$hourCount]\" value=\"$timeOffset\"></td>\n";
+						} else {	//------ If the lesson is already booked or if the DI isnt available, append an empty cell with negative formatting.
+							$appointmentSelectionOutput.=	"			<td class = \"negative\">&nbsp;</td>\n";
+		
+						}				
+		
+					}
+		
+					$appointmentSelectionOutput.=	"		</tr>\n";								
+				}
+?>
+<!-- The following buttons allow the user to switch between add and view modes -->
+<input type="button" value="Add Appointments" onclick="toggleVisibility('addAppointment');" id="toggleForm">
+<input type="button" value="Appointments" onclick="toggleVisibility('appointments');" id="toggleForm">
+<br />
+<br />
+
+<div id="addAppointment">
+	<?php
+		echo $appointmentSelectionAlert;
+		if ($credit = getRemainingLearnerCredit($_SESSION[profileID])){	//------ If the learner driver has credits available, show them the form that allows them to book appointments
+?> You have <?=$credit?> credit(s) left.
+	<!-- The following form allows the learner driver to book appointments -->
+	<form name="appointmentForm" method="POST" action="?p=appointments">
+		<table border="0" width="100%" cellspacing="5" cellpadding="5">
+			<tr>
+				<td colspan="2" bgcolor="#99CFB0">Please choose when you would like 
+				to book your appointments.</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+				<table border="0" cellspacing="5" cellpadding="5">
+					<tr>
+						<!-- This constitutes of the list of various days where the appointments can be booked -->
+						<?=$appointmentTitle?>
+					</tr>
+					<!-- Here, the list of slots/hours where the appointments are available to be booked are shown -->
+					<?=$appointmentSelectionOutput?>
+				</table>
+				</td>
+			</tr>
+			<tr>
+				<td width="50%">
+				<table border="0" cellspacing="5" cellpadding="5">
+					<tr>
+						<td class="negative">Not Available</td>
+					</tr>
+				</table>
+				</td>
+				<td width="50%">
+				<input type="submit" value="Book!" name="book_appointment"></td>
+			</tr>
+		</table>
+	</form>
+	<?php
+		} else echo "<div class = \"negative\">You have no credit to book more lessons.</div>";	//------ If the learner driver has no credits, show them this message.
+?> </div>
+<?php
+	$continuousBooking = 0;	//------ Reset the continuous booking to 0
+	
+	if ($appointments = getUpcomingAppointments($_SESSION[profileID], $theDI)){	//------ Retrieve the list of upcoming appointments between the learner and the associated DI
+		$noOfAppointments = count($appointments);	//------ Count the number of upcoming appointments.
+	
+		for ($appointmentCount = 0; $appointmentCount < $noOfAppointments; $appointmentCount++){	//------ Loop noOfAppointments times.
+			$theAppointment = $appointments[$appointmentCount];	//------ Retrieve the row of appointment corresponding to the appointment count.
+		
+			//------ Assign the detail of the appointment to local variables.
+			$theID = $theAppointment[appointment_id];
+			$theDate = $theAppointment[appointment_date];
+			$theDateInSeconds = strtotime($theDate);
+			$theHumanDate = date("l, jS F 'y", $theDateInSeconds);
+			$theHour = $theAppointment[appointment_hour];
+			$isCancelled = $theAppointment[appointment_cancelled];		
+	
+			if ($theHour + 1 == ($appointments[$appointmentCount+1][appointment_hour])&&$theDate == $appointments[$appointmentCount+1][appointment_date]&&$isCancelled == $appointments[$appointmentCount+1][appointment_cancelled]){	//------ If there is an appointment that follows right after the current appointment, increment continuousBooking by 1
+				$continuousBooking++;
+				$theHiddenIDs.=",$theID";	//------ Compile the list of IDs of appointments that are continuous to the first one.
+			} else {	//------ If the next appointment isnt chain-linked to the current one, proceed below
+				$theHourTo = $theHour + 1;	//------ Work out when the appointment ends
+				$theHourFrom = $theHour - $continuousBooking;	//------ Work out when the appointment starts by taking away the offset.
+				$continuousBooking = 0;	//------ Reset the continuousBooking variable to 0.
+				$theCheckBox = "";	//------ Reset the content of the checkbox to blank
+				$theStyle = "";	//------ Reset the style of the cancelled appointment to blank
+				
+				$twoDays = 2 * 24 * 60 * 60;	//------ work out the number of seconds in 2 days 
+				$remainingTime = ($theDateInSeconds + ($theHourFrom * 60 * 60))- $now;	//------ Work out the remaining time until the appointment.
+				
+				if ($isCancelled){	//------ If the appointment has been cancelled, stylize the blackground by having the background colour red and have it read Cancelled rather than show the check box.
+					$theStyle = " class=\"negative\"";
+					$theCheckBox = "Cancelled!";
+				} else if ($remainingTime < $twoDays && $remainingTime > 0){	//------ If the remaining time until the appointment is less than 2 days and hasn't already taken place, show how many hours are left until the appointment takes place instead of the checkbox.
+					$theCheckBox = round($remainingTime/(60 * 60))." hour(s) left!";			
+				} else {	//------ In all other cases, show the checkbox.
+					$theCheckBox = "<input type=\"checkbox\" name=\"toCancel[]\" value=\"$theID$theHiddenIDs\">";
+				}
+				
+				$theHiddenIDs = "";	//------ Reset the content of the hidden IDs to blank.
+				
+				if ($theCheckBox){	//------ If something has been assigned to the checkbox variable, proceed and add the entry onto the list.
+					$appointmentListOutput.=	"			<tr>\n".
+												"				<td bgcolor=\"#6CB89C\" align=\"center\"$theStyle>\n".
+												"				$theCheckBox</td>\n".
+												"				<td bgcolor=\"#6CB89C\" align=\"right\"$theStyle>$theHumanDate</td>\n".
+												"				<td bgcolor=\"#6CB89C\" align=\"center\"$theStyle>$hours[$theHourFrom]-$hours[$theHourTo]</td>\n".
+												"			</tr>\n";
+				}
+			}
+		}
+	} else $appointmentListOutputAlert = "You haven't booked any appointments yet.";	//------ If no appointments have been booked, output this message
+?>
+<div id="appointments">
+<?php
+	echo $appointmentListOutputAlert;	//------ Output the alert related to managing appointments that have already been booked.
+	if ($appointmentListOutput){	//------ If the appointment list exists, output proceed and output the form and the list enclosed within.
+?>
+	<form name="appointmentViewForm" method="POST" action="?p=appointments">
+		<table border="0" cellspacing="5" cellpadding="5">
+		<!-- The following shows the list of appointments that have been booked -->
+		<?=$appointmentListOutput?>
+			<tr>
+				<td align="center">
+				<input type="submit" value="Cancel!" name="cancel_appointment"></td>
+				<td colspan="2">A minimum notice of 48 hours is required prior to cancellation 
+				for a refund.</td>
+			</tr>
+
+		</table>
+	</form>
+<?php
+	}
+?>
+</div>
+<!-- The following is the default content -->
+<div id="default">
+	Please choose a task you wish you carry out. </div>
+<?php
+		} else echo "Your DI has been suspended by the administrator. Please choose another or <a href = \"?p=contactUs\">seek assistance</a>.";	//------ If the DI has currently been suspended by the Administrator, show this message.
+	} else echo  "This account is not associated with a DI. Please <a href = \"?p=welcomePage\">click here</a> and follow the instructions on the right hand side.";	//------ If the learner is not associated with a DI, show this message.
+} else echo  "You have already passed. Why do you need to book appointments?";	//------ Show this message if the learner driver has already passed.
+bodyFooter();
+?>
+<script name="Javascript">
+function toggleVisibility(what){	//------ This controls the visibility of DIV enclosed content in the page.
+	document.getElementById('addAppointment').style.display='none';
+	document.getElementById('appointments').style.display='none';
+	document.getElementById('default').style.display='none';
+	document.getElementById(what).style.display='block';	//------ This displays the entity that has been specified as the parameter "what"
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>";	//------ If no content has been  specified to load at startup in particular, the default content is assigned.
+
+//------  This function executes when the page loads
+toggleVisibility(visibleAtLoad);
+</script>

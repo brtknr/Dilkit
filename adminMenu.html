@@ -1,0 +1,5 @@
+<!-- This form is embedded into the Status menu and is viewable by the Administrator after they log in -->
+<form method="POST" action="?p=logout">
+	Welcome! You are logged in as an ~<?=$_SESSION[userRank]?>~.
+	<input type="submit" value="Logout" name="logout_submit">
+</form>

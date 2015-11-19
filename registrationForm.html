@@ -1,0 +1,249 @@
+<?php
+GLOBAL $validation;	//------ Retrieve the global variable from  global.php
+
+bodyHeader("Registration",2);
+
+if ($_POST&&!$_SESSION[registered]){	//------ If a form has been submitted
+	$db = new database;	//------ Establish connection with the database
+	$error = "";	//------ Assign the content of the errors to blank
+
+	//------  Retrieve all the data entered on the form
+	$name = ucwords(trim($_POST[reg_name]));
+	$houseno = strtoupper(trim($_POST[reg_houseno]));
+	$postcode = strtoupper(trim($_POST[reg_postcode]));
+	$telephone = trim($_POST[reg_telephone]);
+	$email = strtolower(trim($_POST[reg_email]));
+	$password = trim($_POST[reg_password]);
+	$registrant = trim($_POST[reg_registrant]);
+
+	//------  Name validation
+	if (!ereg($validation[Name], $name)||strlen($name)>50){
+		$error.= "Full Name (permitted characters: alphabets, spaces and hyphens) (max length: 50 characters)\n";
+	}
+	
+	//------ House No. validation
+	if (!ereg($validation[AlphaNumeric], $houseno)||strlen($houseno)>10){
+		$error.= "House Number (permitted characters: numbers and alphabets) (max length: 10 characters)\n";
+	}
+	
+	//------ Postcode validation
+	if (!ereg($validation[Postcode], $postcode)||strlen($postcode)>8){
+		$error.= "Postcode (permitted characters: alphabets and numbers) (max length: 8 characters) (must comply with UK postcode standard)\n";
+	}
+
+	//------ Telephone validation
+	if (!ereg($validation[Telephone], $telephone)){
+		$error.= "Telephone (permitted characters: numbers starting with 0) (length: 11 digits)\n";
+	}
+
+	//------ -mail validation
+	if (!ereg($validation[EmailAddress], $email)||strlen($email)>50){
+		$error.= "Email Address (permitted characters: alphabets, numbers, symbols [_-.@]) (max length: 50 characters) (must be a valid email address format)\n";
+	} else {
+		//------ Check for duplicate email
+		$q = "SELECT `profile_email` FROM `profile` WHERE `profile_email` = '$email';";
+		if ($db->query($q)){
+			$error.= "Email Address (duplicate profile: this email address is aleady associated with a profile in our database)\n";
+		}
+	}
+
+	//------  Password validation
+	if (!ereg($validation[AlphaNumeric], $password)||strlen($password)>10){
+		$error.= "Password (permitted characters: alphabets and numbers) (max length: 10 characters)\n";
+	}
+
+	//------ Checks if the registrant has chosen to be a Driving Instructor or the learner.
+	if ($registrant!="di"&&$registrant!="learner"){
+		$error.= "Registrant (must specify your registrant category)\n";
+	}
+
+
+	if ($error)
+		echo nl2br("<b>Please correct the errors associated with the following properties:</b>\n".$error); //------ If there are error message to show, lead them by this message.
+	else {	//------ If there were no errors found, this is processed.
+		if (!$profileID = getNextID("profile")) $profileID = 100000; //------ Get the next profile ID
+
+		$q = 	"INSERT INTO `dilkit`.`profile` (`profile_id` ,".
+												"`profile_name` ,".
+												"`profile_houseno` ,".
+												"`profile_postcode` ,".
+												"`profile_telephone` ,".
+												"`profile_email` ,".
+												"`profile_password` ,".
+												"`profile_active` ,".
+												"`profile_updated`) ".
+				"VALUES ('$profileID', '$name', '$houseno', '$postcode', '$telephone', '$email', '$password', '1', NOW( ));";
+
+		if($db->rawQuery($q)){
+			$_SESSION["registered"] = true;	//------ Query the database so the data entry of the registering user is done and set the registered status to true.
+
+		//------  If the registrant is a Driving Instructor:
+			if ($registrant=="di"){
+				$q = 	"INSERT INTO `dilkit`.`di` (`di_id` ,".
+													"`di_buzzword` ,".
+													"`di_approved`) ".
+						"VALUES ('$profileID', '', '0');";
+
+		//------ If the registrant is a Learner Driver:
+			} else if ($registrant=="learner"){
+				if (!$learnerID = getNextID("learner")) $learnerID = 10000;
+				$q = 	"INSERT INTO `dilkit`.`learner` (`learner_id` ,".
+														"`learner_passed` ,".
+														"`di_id`) ".
+						"VALUES ('$profileID', '0', '');";	
+			}
+			
+			if(!$db->rawQuery($q)){ //------ The query associates the profile with the user they registered as, i.e, the DI or the Learner.
+				$_SESSION["registered"] = false;
+			}
+		}
+	}
+}
+
+if ($_SESSION["registered"]){
+//------ This is shown if the user has already registered.
+?>
+You have been successfully registered! Please <a href="?p=loginForm">login</a> to continue.
+<?php
+} else {
+//------ Form to show to ask for details in cases when none has been provided or there is an error in the entry.
+?>
+<form name="reg_form" method="POST" action="?p=registrationForm" onSubmit="return checkForm(this)">
+	<table border="0" width="100%" cellspacing="5" cellpadding="5">
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Full Name</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="reg_name" size="30" maxlength="50" value="<?=$_POST[reg_name]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			House Number</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="reg_houseno" size="10" maxlength="10" value="<?=$_POST[reg_houseno]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Postcode</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="reg_postcode" size="8" maxlength="8" value="<?=$_POST[reg_postcode]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Telephone Number</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="reg_telephone" size="11" maxlength="11" value="<?=$_POST[reg_telephone]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			E-mail Address</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="reg_email" size="30" maxlength="50" value="<?=$_POST[reg_email]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Password</td>
+			<td bgcolor="#6CB89C">
+			<input type="password" name="reg_password" size="10" maxlength="10" value="<?=$_POST[reg_password]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Registrant</td>
+			<td bgcolor="#6CB89C">
+			<input type="radio" value="di" name="reg_registrant">DI
+			<input type="radio" value="learner" name="reg_registrant">Learner </td>
+		</tr>
+		<tr>
+			<td width = "50%">
+			<p align="right">All the fields must be filled in.</td>
+			<td>
+			<input type="submit" value="Register!" name="reg_submit"></td>
+		</tr>
+	</table>
+</form>
+<script name="javascript">
+<?php
+$offset = "";
+if ($registrant == "di"){
+	$offset = "[0]";
+} elseif ($registrant == "learner"){
+	$offset = "[1]";
+}
+
+if ($offset){
+	echo "document.reg_form.reg_registrant$offset.checked=true;";
+}
+?>
+
+function checkForm(thisForm){ //------  This function is used to validate the data entered into the form before submission so that none of the blank entries are sent through.
+	submitThisForm = true;
+	errorList = "The following fields require correct completion:\n";
+
+
+	if (isEmpty(thisForm.reg_name.value))	{
+		submitThisForm = false;
+		errorList+= "	Full Name\n";
+	}
+
+	if (isEmpty(thisForm.reg_houseno.value)){
+		submitThisForm = false;
+		errorList+= "	House Number\n";
+	}
+
+	if (isEmpty(thisForm.reg_postcode.value)){
+		submitThisForm = false;
+		errorList+= "	Postcode\n";
+	}
+
+	if (isEmpty(thisForm.reg_telephone.value)){
+		submitThisForm = false;
+		errorList+= "	Telephone Number\n";
+	}
+
+	if (isEmpty(thisForm.reg_email.value)){
+		submitThisForm = false;
+		errorList+= "	E-mail Address\n";
+	}
+
+	if (isEmpty(thisForm.reg_password.value)){
+		submitThisForm = false;
+		errorList+= "	Password\n";
+	}
+
+	if (!thisForm.reg_registrant[0].checked&&!thisForm.reg_registrant[1].checked){
+		submitThisForm = false;
+		errorList+= "	Registrant\n";
+	}
+	
+	if (!submitThisForm){
+		alert (errorList);
+	}
+
+	return submitThisForm;
+}
+
+
+// Source for the Space Trimmer: http://www.aspdev.org/articles/javascript-trim/
+
+function trimSpaces(sString){
+	while (sString.substring(0,1) == ' '){
+		sString = sString.substring(1, sString.length);
+	}
+	while (sString.substring(sString.length-1, sString.length) == ' '){
+		sString = sString.substring(0,sString.length-1);
+	}
+	return sString;
+}
+
+function isEmpty(theString){ //------ Checks if the supplied variable is empty
+	if (trimSpaces(theString)=="") {
+		return true;
+	} else {
+		return false;
+	}
+}
+</script>
+<?php
+}
+bodyFooter();
+?>

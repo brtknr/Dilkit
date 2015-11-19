@@ -1,0 +1,8 @@
+<!-- This shows the link to the registration form and a mini form to login for registered users.  It is implemented in the submenu when the user is visiting the website as a guest. -->
+<form method="POST" action="?p=loginForm">
+	<a class="glowbracket" href="?p=registrationForm"><strong>Register</strong></a> ~ 
+	<a class="glowbracket" href="?p=loginForm"><strong>Login</strong></a>
+	<input type="text" name="login_email" size="8" maxlength="50" value="<?=$_POST[login_email]?>" onfocus="this.value='';">
+	<input type="password" name="login_password" size="8" maxlength="10" value="<?=$_POST[login_password]?>" onfocus="this.value='';">
+	<input type="submit" value="Go" name="login_submit">
+</form>

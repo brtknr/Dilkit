@@ -1,0 +1,78 @@
+/* This colours the object bright red and will usually be used to indicate errors or important notifications.*/ 
+.negative {background-color:#FF0066;}
+
+/* This is for the object on the navigation menu where if the mouse goes over the text, the background changes colour.*/ 
+:hover.glowbracket {background-color:#99CFB0;}
+
+/* This is the style for all the text boxes in the website.*/ 
+input        { border:1px solid #0D8087; color:#0C7F86; font-family:Trebuchet MS; padding-left:5px; padding-right:5px; background-color:#FFFFCC }
+
+/* This is the style for all the text areas in the website.*/ 
+textarea        { border:1px solid #0D8087; color:#0C7F86; font-family:Trebuchet MS; padding-left:5px; padding-right:5px; background-color:#FFFFCC }
+
+/* This is the style for all the form buttons in the website.*/ 
+button       { border-style: double; border-width: 3px }
+
+/* This is the style for hyperlinks that haven't been visited yet.*/ 
+a:link
+{
+	color: #FFFF90; 
+	text-decoration:none
+}
+
+/* This is for the links that have been visited.*/ 
+a:visited
+{
+	color: #DCE6B7; 
+	text-decoration:none
+} 
+
+/* This is for the link that is currently active.*/ 
+a:active
+{
+	color: #FDF166;
+	text-decoration:none
+}
+
+/* This is the default font and the colour of the text in the document.*/ 
+body
+{
+	font-family: Trebuchet MS;
+	color:  #FFFFCC;background-color:#000000;
+}
+
+/* This the the style for Heading 1.*/ 
+h1
+{
+	color: #FFFF90;
+}
+
+/* This is the style for Heading 2.*/ 
+h2
+{
+	color: #FFFFA0; 
+}
+
+/* This is the style for Heading 3.*/ 
+h3
+{
+	color: ##FFFFB0; 
+}
+
+/* This is the style for Heading 4.*/ 
+h4
+{
+	color: ##FFFFC0;
+}
+
+/* This is the style for Heading 5.*/ 
+h5
+{
+	color: ##FFFFD0;
+}
+
+/* This is the style for Heading 6.*/ 
+h6
+{
+	color: ##FFFFE0;
+}

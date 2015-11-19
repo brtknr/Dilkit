@@ -1,0 +1,92 @@
+<?php
+bodyHeader("Communicate with DI",2);
+
+if ($theDIID = getDIIDFromLearnerID($_SESSION[profileID])){	//------ Proceed if the learner driver is associated with a Driving Instructor
+	if ($_POST[message_submit]){	//------ Proceed if a message has been submitted.
+		$db = new database;	//------ Establish connection with the database.
+		
+	 	$messageAlert = "";	//------ Reset the alert variable to blank.
+	 	
+		if (!$theMessageID = getNextID("message")) $theMessageID = 100000;	//------ Retrieve the next available message ID
+		$theMessageContent = nl2br(trim($_POST[message_content]));	//------ Parse the line changing switching characters and trim the white spaces from the content of the message
+		
+		$theContentDifference = strlen($theMessageContent) - 1000;	//------ Work out the difference between the length of the message content and the allowed quota 
+
+		if (!$theMessageContent) $messageAlert.= "Content (you must have something in the content.)\n";	//------ If the message content is blank, output this alert
+		if ($theContentDifference > 0) $messageAlert.= "Content (it is too long by $theContentDifference character(s))\n";	//------ If the content is too long, output this alert
+
+		if (!$messageAlert){	//------ If there are no alerts, execute the content
+			$q = 	"INSERT INTO `dilkit`.`message` (`message_id`,".
+													"`message_content` ,".
+													"`message_generated` ,".							
+													"`message_sender` ,".
+													"`learner_id` ,".																	
+													"`di_id`) ".
+					"VALUES ('$theMessageID','$theMessageContent', NOW(), 'learner', '$_SESSION[profileID]', '$theDIID');";
+	
+			$db->rawQuery($q);	//------ Insert the message into the database table 
+			$messageAlert = "The message has been added to the conversation.";	//------ Output this alert to acknowledge that the message has been added.
+			$_POST = null;	//------ Reset the content of the form to blank.
+		}		
+		
+	}
+
+	if (isActiveProfile($theDIID)) {	//------ Proceed if the profile of the associated Driving Instructor is active.
+	?>
+	<!-- Show the form that allows submission of message -->
+	<form name="communicationForm" method="POST" action="?p=communicate">
+	<table border="0" cellspacing="5" cellpadding="5">
+			<tr>
+				<td align="right" bgcolor="#99CFB0">
+				<textarea rows="2" name="message_content" cols="49"><?=$_POST[message_content]?></textarea></td>
+				<td>
+				<input type="submit" value="Say!" name="message_submit"></td>
+			</tr>
+			</table>
+	</form>
+	<?php
+	} else echo "Your DI has been suspended by the administrator. Please choose another or <a href = \"?p=contactUs\">seek assistance</a>.<br/>You may still view the log of the past conversation with the suspended DI.<br/><br/>";	//------ If the DI has been suspended, show this message.
+	
+	$theConversation = getConversation ($_SESSION[profileID],$theDIID);	//------ Get the log of conversation
+	
+	if ($theConversation){	//------ If there is a log, proceed.
+		$output = "";	//------ Reset the content of the output to blank
+		foreach ($theConversation as $message){	//------ Retrieve the record of conversation one at a time
+			//------ Assign the content of the conversation to local variables
+			$messageID = $message[message_id];
+			$messageContent = $message[message_content];
+			$messageGenerated = date("jS M 'y, g:ia",strtotime($message[message_generated]));
+			$messageSender = $message[message_sender];
+			
+			$theBGColor = ($messageSender == "learner")?"99CFB0":"6CB89C";
+			
+			$theSubject = ($messageSender == "learner")?"You": "The DI";	//------ Assign the appropriate subject.
+			
+			//------ Generate the output
+			$output.= "	<tr>".
+			"		<td bgcolor=\"#$theBGColor\" valign=\"top\">".
+			"		<table border=\"0\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">".
+			"			<tr>".
+			"				<td><b>$theSubject</b> said on <i>$messageGenerated</i></td>".
+			"			</tr>".
+			"			<tr>".
+			"				<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$messageContent</td>".
+			"			</tr>".
+			"		</table>".
+			"		</td>".
+			"	</tr>";
+		}
+		//------ Enclose the output inside the table tags.
+		$output = "<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width=\"100%\">\n$output\n</table>";
+		
+	} else {
+		$output = "Nothing has been said in the conversation yet...";	//------ If there is no record of  any conversation, show this message
+	}
+} else {
+	$output = "This account is not associated with a DI. Please <a href = \"?p=welcomePage\">click here</a> and follow the instructions on the right hand side.";	//------ If the account is not associated with a DI, show this message.
+}
+
+echo $output;	//------ Output the conversation.
+	
+bodyFooter();
+?>

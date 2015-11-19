@@ -1,0 +1,200 @@
+<?php
+bodyHeader("Client Progress",2);
+
+if ($currentClients = getCurrentClients($_SESSION[profileID])){	//------ Retrieve the list of the current clients and proceed if there are any clients
+	$hours = array (8=>"8:00am",9=>"9:00am",10=>"10:00am",11=>"11:00am",12=>"12:00pm",13=>"1:00pm",14=>"2:00pm",15=>"3:00pm",16=>"4:00pm",17=>"5:00pm",18=>"6:00pm",19=>"7:00pm",20=>"8:00pm");	//------ Specify numbers to their readable equivalent.
+	$now = time();	//------ Retrieve the current time
+
+	$appointmentListOutputAlert = "";	//------ Reset the alerts related to appointments to blank.
+	$divContent = "";	//------ Reset the list of DIV enclosed content to blank.
+
+	$db = new database;	//------ Establish connection with the database.
+
+	if ($_POST[save_progress]){	//------ If the form has been submitted requesting saving of progress, proceed.
+		$visibleAtLoad = $_POST[learner_id];	//------ When the page loads, make the section that displays the progress of the specified learner visible.
+		
+		$_POST[progress_remarks] = trim($_POST[progress_remarks]);	//------ Trim the whitespaces in the progress remarks.
+		if (!progressAlreadyExists($_POST[learner_id],$_SESSION[profileID],$_POST[progress_type_id],$_POST[progress_rating_id])){	//------ If the progress doesnt already exist, proceed.
+			$q = "INSERT INTO `progress` (`progress_type_id`,`progress_rating_id`,`progress_remarks`,`appointment_id`) VALUES ('$_POST[progress_type_id]','$_POST[progress_rating_id]','$_POST[progress_remarks]','$_POST[appointment_id]');";
+			$db->rawQuery($q);	//------ Query the database requesting the entry of the message
+			$appointmentListOutputAlert = "The progress has been saved.";	//------ Display this message acknowledging that the progress has been saved.
+		} else $appointmentListOutputAlert = "There is already a record that indicates this level of progress in this area.";	//------ If the progress already exists, display this message.
+	}
+	
+	if ($theProgressRatings = getProgressRatings()){	//------ If there is a list of progress ratings available, proceed
+		foreach ($theProgressRatings as $theField){	//------ Retrieve the content of the list one at a time
+			$theProgressRatingsList.="			<option value=\"$theField[progress_rating_id]\">$theField[progress_rating_name]</option>\n";	//------ Build a dropdown list that lists the various ratings that can be applied to a progress.
+		}
+	}
+	
+	if ($theProgressTypes = getProgressTypes()){	//------ If there is a list of various types of progress, proceed
+		foreach ($theProgressTypes as $theField){	//------ Retrieve the content of the list one at a time
+			$theProgressTypesList.="			<option value=\"$theField[progress_type_id]\">$theField[progress_type_name]</option>\n";	//------ Build a dropdown list that list the various types of progress that can be made.
+		}
+	}
+	
+	foreach ($currentClients as $theClient){	//------ Retrieve the content of the current clients one at a time.
+
+		$appointmentListOutput = "";	//------ Reset the content of the appointments list to blank.
+		$continuousBooking = 0;	//------ Reset the offset that is used to control continuous bookings to blank
+		
+		if ($appointments = getPastAppointments($theClient[profile_id], $_SESSION[profileID])){	//------ Retrieve the list of past appoints between this DI and the current client.
+			$noOfAppointments = count($appointments);	//------ Count the number of appointments
+		
+			for ($appointmentCount = 0; $appointmentCount < $noOfAppointments; $appointmentCount++){	//------ Create a definite loop starting at 0 and loop until the appointmentCount meets the number of appointments, incrementing by 1 every loop.
+				$theAppointment = $appointments[$appointmentCount];	//------ Retrieve the row containing the detail of the appointment specified by the appointment
+			
+				//------ Assign the detail of the appointment to local variables.
+				$theID = $theAppointment[appointment_id];
+				$theDate = $theAppointment[appointment_date];
+				$theDateInSeconds = strtotime($theDate);
+				$theHumanDate = date("l, jS F 'y", $theDateInSeconds);
+				$theHour = $theAppointment[appointment_hour];
+				
+				if (!$continuousBooking){
+					$firstAppointmentID = $theID;
+				}
+
+		
+				if ($theHour + 1 == ($appointments[$appointmentCount+1][appointment_hour])&&$theDate == $appointments[$appointmentCount+1][appointment_date]&&$isCancelled == $appointments[$appointmentCount+1][appointment_cancelled]){	//------ If the next appointment is continuous with this appointment, increment the continuousBooking variable by 1.
+					$continuousBooking++;
+				} else {	//------ If the next appointment isn't continuous with the current appointment, proceed with the following
+					$theHourTo = $theHour + 1;	//------ Work out when the appointment is due to end.
+					$theHourFrom = $theHour - $continuousBooking;	//------ Work out when the appointment starts by applying the continuousBooking offset.
+					$continuousBooking = 0;	//------ Reset the offset to 0.
+		
+					$remainingTime = ($theDateInSeconds + ($theHourFrom * 60 * 60))- $now;	//------ Work out the remaining time until the appointment
+					
+					if ($remainingTime < 0){	//------ If the appointment took place in the past (remainingTime is negative), proceed.
+			
+						$isChecked = "";	//------ Set this to blank by default
+						
+						if ($_POST[appointment_id] == $firstAppointmentID){	//------ If this appointment matches the one specified in the form, assign the isChecked to true which controls whether the radio button representing the appointment is checked or not.
+							$isChecked = " checked";
+						}
+						
+						//------ Generate the entity of the list below.
+						$appointmentListOutput.=	"			<tr>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\">\n".
+													"				<input type=\"radio\" value=\"$firstAppointmentID\" name=\"appointment_id\"$isChecked></td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"right\">$theHumanDate</td>\n".
+													"				<td bgcolor=\"#6CB89C\" align=\"center\">$hours[$theHourFrom]-$hours[$theHourTo]</td>\n".
+													"			</tr>\n";
+	
+						$theProgressList = "";	//------ Reset the content of the progress list to blank.
+						
+						if ($progresses = getProgressFromAppointment($firstAppointmentID)){	//------ Retrieve the progress made and proceed if the list is not empty.
+							foreach ($progresses as $theProgress){	//------ Retrieve the detail o fthe progress one at a time
+								if ($theRemarks = $theProgress[progress_remarks]){	//------ If the remarks isn't empty, stylize it as italic and add it to the list.
+									$theRemarks = " - [<i>$theRemarks</i>]";
+								}
+								
+								$theProgressList.= "					<li>$theProgress[progress_rating_name] $theProgress[progress_type_name]$theRemarks.</li>\n";	//------ Generate the list of progress made
+							}
+							
+							//------ Embed the list of progress to the appointmentListOutput.
+							$appointmentListOutput.=	"			<tr>\n".
+														"				<td bgcolor=\"#99CFB0\" colspan=\"3\">\n".
+														"				<ul>\n".
+														"					$theProgressList".
+														"				</ul>\n".
+														"				</td>\n".
+														"			</tr>\n";
+						}
+					}					
+				}
+			}
+		}
+
+		if (!$appointmentListOutput){	//------ If there is no list of appointments, show the message below.
+			$divContent.= 	"<div id=\"$theClient[profile_id]\">\n".
+							"	There is no record of past appointments between you and this client.".
+							"</div>\n";
+		} else {	//------ If there is a list of appointments, proceed below and output it as a table containing the form to add more progresses.
+			$divContent.= 	"	<div id=\"$theClient[profile_id]\">\n".
+							"	<form name=\"progressForm$theClient[profile_id]\" method=\"POST\" action=\"?p=trackProgress\" onsubmit=\"return checkForm(this)\">".
+							"		<input type=\"hidden\" value=\"$theClient[profile_id]\" name=\"learner_id\">\n".
+							"		<p>Please fill in the form below and choose the appointment where the progress was made to register a progress.\n".
+							"		<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\" width = \"100%\">\n".
+							"			<tr>\n".
+							"				<td align=\"right\" bgcolor=\"#99CFB0\">The client</td>\n".
+							"				<td bgcolor=\"#6CB89C\"><select size=\"1\" name=\"progress_rating_id\">\n".
+							"				$theProgressRatingsList\n".
+							"				</select><select size=\"1\" name=\"progress_type_id\">\n".
+							"				$theProgressTypesList\n".
+							"				</select></td>\n".
+							"			</tr>\n".
+							"			<tr>\n".
+							"				<td align=\"right\" bgcolor=\"#99CFB0\">Remarks^</td>\n".
+							"				<td bgcolor=\"#6CB89C\">\n".
+							"				<input type=\"text\" name=\"progress_remarks\" size=\"35\" maxlength=\"100\"></td>\n".
+							"			</tr>\n".
+							"			<tr>\n".
+							"				<td>\n".
+							"				<p align=\"right\">^Optional</p>\n".
+							"				</td>\n".
+							"				<td><input type=\"submit\" value=\"Save Progress\" name=\"save_progress\"></td>\n".
+							"			</tr>\n".
+							"		</table>\n</p>\n".
+							"		<table border=\"0\" cellspacing=\"5\" cellpadding=\"5\">\n".
+							"			$appointmentListOutput\n".
+							"		</table>\n".
+							"	</form>".
+							"	</div>\n";						
+		}
+		
+		$dropDown.= "<option value=\"$theClient[profile_id]\">$theClient[profile_name]</option>\n";	//------ Generate the content of the dropdown menu for client selection
+		
+		$hideList.= "document.getElementById('$theClient[profile_id]').style.display='none';\n";	//------ Generate the list of commands that control the visibility of the content contained within DIV enclosed tags.
+	
+	}	
+	$defaultContent = "Please choose a client to take further action.";	//------ Assign the default content to show
+} else {
+	$defaultContent = "This account isn't associated with any clients yet.";	//------ Show this message as the default content if the DI is not associated with any current learner drivers.
+}
+
+if ($dropDown) {	//------ If the dropdown menu contains the list of clients, proceed below to enclose it inside the form.
+$dropDown = "<form name=\"selectMenuForm\">".
+			"<select size=\"1\" name=\"clientChooser\" onChange=\"toggleVisibility(this.options[ this.selectedIndex].value)\">".
+			"<option value =\"default\">&nbsp;</option>".
+			$dropDown.
+			"</select></form>";
+}
+
+echo $dropDown?"<p>$dropDown<p/>":"";	//------ Output the dropdown menu
+
+echo $appointmentListOutputAlert?"<div class=\"negative\">$appointmentListOutputAlert</div>":"";	//------ Output the appointment related alerts.
+?>
+<!-- Output the DIV enclosed content -->
+<?=$divContent?>
+
+<!-- Output the default content -->
+<div id="default">
+	<?=$defaultContent?>
+</div>
+<?php
+bodyFooter();
+?>
+<script name="Javascript">
+function toggleVisibility(what){	//------ This controls the visibility of the DIV enclosed content
+//------ This hides all the DIV enclosed contents
+<?=$hideList?>
+document.getElementById('default').style.display='none';	//------ This hides the default content
+document.getElementById(what).style.display='block';	//------ This makes the element specified by "what" visible
+}
+
+visibleAtLoad = "<?=$visibleAtLoad = $visibleAtLoad?$visibleAtLoad:'default'?>";	//------ If no content has been specified to load at startup, the default content is assigned.
+
+//------  This function executes when the page loads
+toggleVisibility(visibleAtLoad);
+
+function checkForm(theForm){	//------ This is used to check the form before submission.
+	for (i = 0; i < theForm.appointment_id.length; i++){	//------ loop the number of times there is occurence of appointments in the list.
+		if (theForm.appointment_id[i].checked){	//------ if an appointment is selected, submit the form
+			return true;
+		}
+	}
+	alert ("You must choose an appointment in reference to which you are recording the progress.");	//------ Show this if no appointment is found to have been checked.
+	return false;	//------ As a result, return false and stop the form from being submitted.
+}
+</script>

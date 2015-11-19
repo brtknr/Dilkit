@@ -1,0 +1,70 @@
+<?php
+bodyHeader("Settings",2);
+echo "<h3>Change Login Details</h3>";
+
+
+if ($_POST[change]){ //------ If the form has been submitted requesting the change of password, carry out the following actions...
+	//------ Retrieve the content of the form and assign them to the internal variables
+	$oldUsername = trim($_POST["current_username"]);
+	$oldPassword = trim($_POST["current_password"]);
+	$newUsername = trim($_POST["desired_username"]);
+	$newPassword = trim($_POST["desired_password"]);
+	
+	if (isAdmin ($oldUsername, $oldPassword)){	//------ If the user provided the correct administrator details, do the following...
+		if ($newUsername||$newPassword){	//------ If the content of either the new username or the new password isn't blank, proceed.
+			$newUsername = $newUsername?$newUsername:$oldUsername;	//------ If the username is blank, assign the current username
+			$newPassword = $newPassword?$newPassword:$oldPassword;	//------ If the password is blank, assign the current password
+		
+			//------ Save it into the login.info file.
+			$handle = fopen ("login.info", "w");
+			fwrite ($handle,$newUsername."\n".$newPassword);
+			fclose ($handle);
+			
+			$_POST = "";	//------ Reset the content of the form
+			
+			echo "The administrator login detail has been successfully changed.";	//------ Display this message acknowledging the change
+		} else echo "Nothing To Change (you must specify at least a username or a password.)";	//------ Display this if both new username and password are blank
+	} else echo "Invalid Details (the username and password you entered could not be matched)";	//------ Display this if the provided authenciation detail doesn't match
+}
+
+?>
+<!-- Show the form that allows the admin to change their details -->
+<form name="reg_form" method="POST" action="?p=settings" onSubmit="return checkForm(this)">
+	<table border="0" width="100%" cellspacing="5" cellpadding="5">
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Current Username^</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="current_username" size="10" maxlength="10" value="<?=$_POST[current_username]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Current Password^</td>
+			<td bgcolor="#6CB89C">
+			<input type="password" name="current_password" size="10" maxlength="10" value="<?=$_POST[current_password]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Desired Username*</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="desired_username" size="10" maxlength="10" value="<?=$_POST[desired_username]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%" align="right" bgcolor="#99CFB0">
+			Desired Password*</td>
+			<td bgcolor="#6CB89C">
+			<input type="text" name="desired_password" size="10" maxlength="10" value="<?=$_POST[desired_password]?>"></td>
+		</tr>
+		<tr>
+			<td width = "50%">
+			<p align="right">^Required<br>
+			*At least one of these needs to be filled in</td>
+			<td>
+			<input type="submit" value="Change!" name="change"></td>
+		</tr>
+	</table>
+</form>
+
+<?php
+bodyFooter();
+?>
