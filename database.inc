@@ -8,7 +8,7 @@ class database {
 	}
 
 	function query ($query){
-	$this->open("10.6.166.162","dilkit","Sangam2211","dilkit");
+	$this->open("localhost","dilkit","password","dilkit");
 
 	$result = @mysql_query($query) or die('MySQL Query Error: ' . mysql_error());
 
